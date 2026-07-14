@@ -725,54 +725,63 @@ function HeroSection({ onDoorsReady }) {
             position: "absolute", inset: 0,
             background: "radial-gradient(ellipse 100% 60% at 50% 38%, rgba(255,242,185,0.55) 0%, rgba(255,220,110,0.20) 45%, transparent 80%)",
           }} />
-          {/* Very soft sliver — blurred wide so no hard edge */}
-          <div style={{
-            position: "absolute",
-            top: "5%", bottom: "5%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 8,
-            background: "linear-gradient(to bottom, transparent 0%, rgba(255,248,210,0.45) 12%, rgba(255,248,210,0.45) 88%, transparent 100%)",
-            filter: "blur(4px)",
-          }} />
+
         </motion.div>
 
         {/*
-          ══ DOOR-SURFACE CRACK LIGHT ══
-          Light that spills onto the INNER EDGES of each door — only near the
-          gap. Uses mix-blend-mode:screen so it brightens the door texture
-          without painting over it. Tight falloff (only ~120px from seam).
-          Fades to 0 as doors open (same glowOp transform as gap glow).
-          z:12 — above gap glow so it renders on the door face.
+          ══ FULL BACKGROUND GLOW ══
+          Sits behind the doors (z:4, above the hero bg at z:1 but below doors at z:10).
+          Covers the entire viewport with a warm golden bloom centred on the seam.
+          Fades out on scroll together with the gap glow.
         */}
-        {/* Left door inner-edge light */}
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 4,
+            opacity: glowOp,
+            pointerEvents: "none",
+            background: "radial-gradient(ellipse 60% 70% at 50% 45%, rgba(255,220,100,0.38) 0%, rgba(220,170,50,0.18) 40%, rgba(180,120,20,0.07) 70%, transparent 100%)",
+          }}
+        />
+
+        {/*
+          ══ DOOR-SURFACE CRACK LIGHT ══
+          Radial gradients anchored to the inner seam edge of each door,
+          so light bleeds naturally into the wood and has no hard rectangle edge.
+          mix-blend-mode:screen brightens the texture without painting over it.
+          z:12 — renders on top of the door face.
+        */}
+        {/* Left door — light radiates from its RIGHT edge inward */}
         <motion.div
           aria-hidden="true"
           style={{
             position: "absolute",
             top: 0, bottom: 0,
             right: "50%",
-            width: 100,
+            width: 180,
             zIndex: 12,
             opacity: glowOp,
             pointerEvents: "none",
             mixBlendMode: "screen",
-            background: "linear-gradient(to left, rgba(255,230,120,0.28) 0%, rgba(255,210,80,0.10) 50%, transparent 100%)",
+            /* radial anchored to the right edge so falloff goes left */
+            background: "radial-gradient(ellipse 100% 80% at 100% 50%, rgba(255,232,130,0.42) 0%, rgba(255,210,80,0.16) 40%, rgba(255,190,50,0.04) 70%, transparent 100%)",
           }}
         />
-        {/* Right door inner-edge light */}
+        {/* Right door — light radiates from its LEFT edge inward */}
         <motion.div
           aria-hidden="true"
           style={{
             position: "absolute",
             top: 0, bottom: 0,
             left: "50%",
-            width: 100,
+            width: 180,
             zIndex: 12,
             opacity: glowOp,
             pointerEvents: "none",
             mixBlendMode: "screen",
-            background: "linear-gradient(to right, rgba(255,230,120,0.28) 0%, rgba(255,210,80,0.10) 50%, transparent 100%)",
+            background: "radial-gradient(ellipse 100% 80% at 0% 50%, rgba(255,232,130,0.42) 0%, rgba(255,210,80,0.16) 40%, rgba(255,190,50,0.04) 70%, transparent 100%)",
           }}
         />
 
