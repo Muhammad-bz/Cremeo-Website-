@@ -345,7 +345,7 @@ function DoorBell({ doorsReady }) {
     function onScroll() {
       const y = window.scrollY;
       /* 0 → swingEnd maps to 0° → 90° rotation */
-      const rot = Math.min(y / swingEnd, 1) * 90;
+      const rot = Math.min(y / swingEnd, 1) * -90;
       /* fade: fully visible at y=0, gone by fadeEnd */
       const op  = Math.max(0, 1 - y / fadeEnd);
       scrollRot.set(rot);
@@ -555,8 +555,8 @@ function HeroSection({ onDoorsReady }) {
   const btnOp   = useTransform(progress, [0.70, 0.92], [0, 1]);
   const btnY    = useTransform(progress, [0.70, 0.92], [20, 0]);
 
-  /* ── Glow: starts fully visible covering the bg, fades out as doors open ── */
-  const glowOp = useTransform(progress, [0, 0.55], [1, 0]);
+  /* ── Glow: fades out in sync with the doors (not before) ── */
+  const glowOp = useTransform(progress, [0.72, 0.98], [1, 0]);
 
   /* ── Scroll hint fades quickly ── */
   const hintOp = useTransform(progress, [0, 0.08], [1, 0]);
@@ -720,17 +720,26 @@ function HeroSection({ onDoorsReady }) {
             pointerEvents: "none",
           }}
         >
-          {/* Solid base — zero bleed-through from the hero photo */}
+          {/* Solid dark base — blocks hero photo bleed-through */}
           <div style={{
             position: "absolute", inset: 0,
             background: "#1C0B03",
           }} />
-          {/* Warm amber radial fill */}
+          {/* Wide warm amber flood — illuminates the full area behind the doors */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 100% 100% at 50% 50%, rgba(190,118,32,0.90) 0%, rgba(135,74,14,0.97) 45%, rgba(20,8,2,1) 100%)",
+            background: "radial-gradient(ellipse 160% 120% at 50% 50%, rgba(220,148,42,0.95) 0%, rgba(180,100,20,0.98) 30%, rgba(100,48,8,1) 65%, rgba(20,8,2,1) 100%)",
           }} />
-
+          {/* Secondary wide spread — pushes warm light into the corners */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "radial-gradient(ellipse 200% 100% at 50% 40%, rgba(255,175,60,0.18) 0%, rgba(180,90,10,0.08) 55%, transparent 80%)",
+          }} />
+          {/* Bright hot core at the seam — intense centre light source */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "radial-gradient(ellipse 18% 90% at 50% 50%, rgba(255,210,100,0.55) 0%, rgba(220,140,30,0.22) 50%, transparent 100%)",
+          }} />
         </motion.div>
 
         {/* ══ THE DOORS ══ */}
