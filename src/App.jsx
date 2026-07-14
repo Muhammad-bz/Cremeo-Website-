@@ -260,31 +260,148 @@ const IMG = {
 };
 
 /* ═══════════════════════════════════════════════
-   DATA
+   DATA  — single source of truth for all products.
+   To connect an API later, replace MENU_DATA with
+   a fetch() call and pass results through the same
+   shape: { id, name, price, category, img, desc? }
 ═══════════════════════════════════════════════ */
+
+// Category image pools — matched by product type
+const CAT_IMGS = {
+  "Bento Cake":    "https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=600&q=80&auto=format&fit=crop",
+  "Cake 1 Pound":  "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&q=80&auto=format&fit=crop",
+  "Cake 1.5 Pound":"https://images.unsplash.com/photo-1535141192574-5d4897c12636?w=600&q=80&auto=format&fit=crop",
+  "Cake 2 Pound":  "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=600&q=80&auto=format&fit=crop",
+  "Dream Cake":    "https://images.unsplash.com/photo-1559620192-032c4bc4674e?w=600&q=80&auto=format&fit=crop",
+  "Pastries":      "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&q=80&auto=format&fit=crop",
+  "Donut":         "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=600&q=80&auto=format&fit=crop",
+  "Seasonal":      "https://images.unsplash.com/photo-1571115177098-24ec42ed204d?w=600&q=80&auto=format&fit=crop",
+  "Sundes":        "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80&auto=format&fit=crop",
+  "Bowls":         "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80&auto=format&fit=crop",
+  "Cream Puff":    "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&q=80&auto=format&fit=crop",
+  "Loaf Cakes":    "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=600&q=80&auto=format&fit=crop",
+  "Loaded Brownie":"https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&q=80&auto=format&fit=crop",
+  "Cup Cake":      "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=600&q=80&auto=format&fit=crop",
+  "Cake Pops":     "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=600&q=80&auto=format&fit=crop",
+  "Tarts":         "https://images.unsplash.com/photo-1621188988909-fbef0a88dc04?w=600&q=80&auto=format&fit=crop",
+  "Savory Foods":  "https://images.unsplash.com/photo-1568254183919-78a4f43a2877?w=600&q=80&auto=format&fit=crop",
+  "American Kuisine (Imported)": "https://images.unsplash.com/photo-1603046891744-1f21f27ae50a?w=600&q=80&auto=format&fit=crop",
+  "Coffee":        "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80&auto=format&fit=crop",
+};
+const fallbackImg = (cat) => CAT_IMGS[cat] || IMG.feat1;
+
+const MENU_DATA = [
+  // ── Bento Cake ──────────────────────────────
+  { id:  1, category: "Bento Cake",    name: "Chocolate Fudge",              price: 920  },
+  { id:  2, category: "Bento Cake",    name: "Chocolate Caramel",            price: 920  },
+  // ── Cake 1 Pound ────────────────────────────
+  { id:  3, category: "Cake 1 Pound",  name: "Double Chocolate Fudge",       price: 1680 },
+  { id:  4, category: "Cake 1 Pound",  name: "Butter Scotch Caramel Crunch", price: 1680 },
+  { id:  5, category: "Cake 1 Pound",  name: "Pistachio Three Milk",         price: 1850 },
+  { id:  6, category: "Cake 1 Pound",  name: "Bonello Three Milk",           price: 1850 },
+  { id:  7, category: "Cake 1 Pound",  name: "Milky Malt",                   price: 1850 },
+  { id:  8, category: "Cake 1 Pound",  name: "Chocolate Fudge",              price: 1850 },
+  { id:  9, category: "Cake 1 Pound",  name: "Chocolate Caremal",            price: 1890 },
+  { id: 10, category: "Cake 1 Pound",  name: "Chocolate Nutela",             price: 2160 },
+  // ── Cake 1.5 Pound ──────────────────────────
+  { id: 11, category: "Cake 1.5 Pound", name: "Chocolate Black Forest",      price: 1290 },
+  { id: 12, category: "Cake 1.5 Pound", name: "Chocolate Gunash",            price: 1290 },
+  { id: 13, category: "Cake 1.5 Pound", name: "Chocolate Cadbury",           price: 2160 },
+  { id: 14, category: "Cake 1.5 Pound", name: "Red Velvet",                  price: 2160 },
+  { id: 15, category: "Cake 1.5 Pound", name: "Lotus Biscoff",               price: 2160 },
+  { id: 16, category: "Cake 1.5 Pound", name: "Pine Apple Fresh Cream",      price: 1750 },
+  { id: 17, category: "Cake 1.5 Pound", name: "Three Milk",                  price: 1890 },
+  // ── Cake 2 Pound ────────────────────────────
+  { id: 18, category: "Cake 2 Pound",  name: "Chocolate Fudge",              price: 2770 },
+  { id: 19, category: "Cake 2 Pound",  name: "Chocolate Caremal",            price: 2800 },
+  { id: 20, category: "Cake 2 Pound",  name: "Chocolate Nutela",             price: 2980 },
+  { id: 21, category: "Cake 2 Pound",  name: "Chocolate Black Forest",       price: 2810 },
+  { id: 22, category: "Cake 2 Pound",  name: "Chocolate Gunash",             price: 2810 },
+  { id: 23, category: "Cake 2 Pound",  name: "Chocolate Cadbury",            price: 2980 },
+  { id: 24, category: "Cake 2 Pound",  name: "Red Velvet",                   price: 2980 },
+  { id: 25, category: "Cake 2 Pound",  name: "Lotus Biscoff",                price: 2980 },
+  { id: 26, category: "Cake 2 Pound",  name: "Pineapple Fresh Cream",        price: 2670 },
+  { id: 27, category: "Cake 2 Pound",  name: "Three Milk",                   price: 2810 },
+  // ── Dream Cake ──────────────────────────────
+  { id: 28, category: "Dream Cake",    name: "Dream Cake",                   price: 550  },
+  { id: 29, category: "Dream Cake",    name: "Lawa Cake",                    price: 600  },
+  // ── Pastries ────────────────────────────────
+  { id: 30, category: "Pastries",      name: "Milky Malt",                   price: 250  },
+  { id: 31, category: "Pastries",      name: "Red Velvet",                   price: 250  },
+  { id: 32, category: "Pastries",      name: "Three Milk",                   price: 250  },
+  // ── Donut ───────────────────────────────────
+  { id: 33, category: "Donut",         name: "Choclate Filled donut",        price: 250  },
+  // ── Seasonal ────────────────────────────────
+  { id: 34, category: "Seasonal",      name: "Mango Malai Cake 1.5 Pounds",  price: 1250 },
+  { id: 35, category: "Seasonal",      name: "Mango Three Milk Cake",        price: 950  },
+  // ── Sundes ──────────────────────────────────
+  { id: 36, category: "Sundes",        name: "Nutella",                      price: 350  },
+  { id: 37, category: "Sundes",        name: "Lotus",                        price: 350  },
+  { id: 38, category: "Sundes",        name: "Red Velvet",                   price: 350  },
+  { id: 39, category: "Sundes",        name: "Caramel",                      price: 350  },
+  { id: 40, category: "Sundes",        name: "Nutella",                      price: 440  },
+  { id: 41, category: "Sundes",        name: "Lotus Biscoff",                price: 450  },
+  { id: 42, category: "Sundes",        name: "Three Milk",                   price: 400  },
+  // ── Bowls ───────────────────────────────────
+  { id: 43, category: "Bowls",         name: "Bonello Three Milk",           price: 500  },
+  { id: 44, category: "Bowls",         name: "Pistachio Three Milk",         price: 550  },
+  { id: 45, category: "Bowls",         name: "Lazy Cat",                     price: 450  },
+  { id: 46, category: "Bowls",         name: "Matilda Cake",                 price: 450  },
+  // ── Cream Puff ──────────────────────────────
+  { id: 47, category: "Cream Puff",    name: "Creampuff Box 300gm",          price: 450  },
+  { id: 48, category: "Cream Puff",    name: "Chocolate Puff Box 300 gm",    price: 450  },
+  // ── Loaf Cakes ──────────────────────────────
+  { id: 49, category: "Loaf Cakes",    name: "Oreo",                         price: 550  },
+  { id: 50, category: "Loaf Cakes",    name: "Red Velvet",                   price: 600  },
+  { id: 51, category: "Loaf Cakes",    name: "Chocolate Fudge",              price: 575  },
+  { id: 52, category: "Loaf Cakes",    name: "Lotus Biscoff",                price: 575  },
+  { id: 53, category: "Loaf Cakes",    name: "Lotus",                        price: 300  },
+  { id: 54, category: "Loaf Cakes",    name: "Nutella",                      price: 250  },
+  // ── Loaded Brownie ──────────────────────────
+  { id: 55, category: "Loaded Brownie", name: "Oreo",                        price: 230  },
+  { id: 56, category: "Loaded Brownie", name: "Cadbury",                     price: 300  },
+  { id: 57, category: "Loaded Brownie", name: "Nuty",                        price: 280  },
+  { id: 58, category: "Loaded Brownie", name: "Classic Fudge",               price: 250  },
+  { id: 59, category: "Loaded Brownie", name: "Oreo Fudge",                  price: 230  },
+  { id: 60, category: "Loaded Brownie", name: "Double Chocolate",            price: 245  },
+  // ── Cup Cake ────────────────────────────────
+  { id: 61, category: "Cup Cake",      name: "Nutella",                      price: 250  },
+  { id: 62, category: "Cup Cake",      name: "Oreo",                         price: 230  },
+  { id: 63, category: "Cup Cake",      name: "Lotus",                        price: 240  },
+  { id: 64, category: "Cup Cake",      name: "Chocolate Fudge",              price: 240  },
+  // ── Cake Pops ───────────────────────────────
+  { id: 65, category: "Cake Pops",     name: "Vanilla",                      price: 235  },
+  { id: 66, category: "Cake Pops",     name: "Chocolate",                    price: 250  },
+  // ── Tarts ───────────────────────────────────
+  { id: 67, category: "Tarts",         name: "Lemon",                        price: 250  },
+  { id: 68, category: "Tarts",         name: "Mango",                        price: 250  },
+  // ── Savory Foods ────────────────────────────
+  { id: 69, category: "Savory Foods",  name: "Chicken Mayo Sandwich",        price: 250  },
+  { id: 70, category: "Savory Foods",  name: "Chicken Tikka Sandwich",       price: 280  },
+  { id: 71, category: "Savory Foods",  name: "Shami Kabab",                  price: 120  },
+  { id: 72, category: "Savory Foods",  name: "Macroni 250 g",                price: 280  },
+  // ── American Kuisine (Imported) ─────────────
+  { id: 73, category: "American Kuisine (Imported)", name: "Swiss Pound Cake",          price: 760  },
+  { id: 74, category: "American Kuisine (Imported)", name: "Sugar Free Pound Cake",     price: 960  },
+  { id: 75, category: "American Kuisine (Imported)", name: "Oat Cookies 176 gms",       price: 845  },
+  { id: 76, category: "American Kuisine (Imported)", name: "Soft Cookies gms",          price: 845  },
+  { id: 77, category: "American Kuisine (Imported)", name: "Gluten Free Cake Rusk grms",price: 650  },
+  { id: 78, category: "American Kuisine (Imported)", name: "CREMEO Wheat Delight 1Kg",  price: 1980 },
+  // ── Coffee ──────────────────────────────────
+  { id: 79, category: "Coffee",        name: "Hot Coffee",                   price: 250  },
+  { id: 80, category: "Coffee",        name: "Cold Coffee",                  price: 290  },
+].map((p) => ({ ...p, img: fallbackImg(p.category), desc: "" }));
+
+// Featured picks shown at top (hand-curated)
 const FEATURED = [
-  { id: 1, name: "Honey Almond Tart",   price: 850,  tag: "Bestseller",  img: IMG.feat1, desc: "Buttery pastry shell filled with silky almond cream and local wildflower honey." },
-  { id: 2, name: "Classic Croissant",   price: 350,  tag: "Daily Fresh", img: IMG.feat2, desc: "Laminated with 81 layers of pure butter — golden, flaky, impossibly light." },
-  { id: 3, name: "Cardamom Pound Cake", price: 1200, tag: "Chef's Pick", img: IMG.feat3, desc: "A warming blend of cardamom and vanilla in a dense, moist pound cake." },
+  { ...MENU_DATA.find(p => p.id === 14),  tag: "Fan Favourite", desc: "Classic red velvet — velvety crumb, deeply rich, finished with cream." },
+  { ...MENU_DATA.find(p => p.id === 28),  tag: "Must Try",      desc: "Our signature Dream Cake — light, airy and impossible to resist." },
+  { ...MENU_DATA.find(p => p.id === 44),  tag: "Chef's Pick",   desc: "Pistachio Three Milk bowl — decadent, nutty, completely indulgent." },
 ];
-const CAKES = [
-  { id: 10, name: "Chocolate Truffle Cake", price: 2400, img: IMG.cakes1, desc: "Three layers of dark chocolate sponge with ganache and fresh raspberries." },
-  { id: 11, name: "Vanilla Dream Cake",     price: 2100, img: IMG.cakes2, desc: "Delicate vanilla bean sponge with Swiss meringue buttercream." },
-  { id: 12, name: "Strawberry Chantilly",   price: 2600, img: IMG.cakes3, desc: "Fresh strawberry compote layered with light chantilly cream." },
-  { id: 13, name: "Red Velvet Celebration", price: 2800, img: IMG.cakes4, desc: "Classic red velvet with cream cheese frosting and gold leaf garnish." },
-];
-const BREADS = [
-  { id: 20, name: "Sourdough Country Loaf", price: 650, img: IMG.breads1, desc: "Long-fermented with a crackling crust and open, chewy crumb." },
-  { id: 21, name: "Rosemary Focaccia",      price: 550, img: IMG.breads2, desc: "Dimpled olive oil bread with sea salt and fresh rosemary." },
-  { id: 22, name: "Multigrain Batard",      price: 700, img: IMG.breads3, desc: "Seeds and whole grains in a hearty oval loaf with nutty depth." },
-  { id: 23, name: "Brioche Pullman",        price: 850, img: IMG.breads4, desc: "Pillowy, egg-enriched brioche baked in a Pullman tin for perfect slices." },
-];
-const COOKIES = [
-  { id: 30, name: "Brown Butter Choc Chip", price: 180, img: IMG.cookies1, desc: "Browned butter, sea salt flakes, and dark chocolate chunks." },
-  { id: 31, name: "Pistachio Crescent",     price: 160, img: IMG.cookies2, desc: "Delicate Austrian crescent cookies rolled in pistachio sugar." },
-  { id: 32, name: "Saffron Shortbread",     price: 200, img: IMG.cookies3, desc: "Buttery shortbread infused with a pinch of premium saffron." },
-  { id: 33, name: "Éclair au Chocolat",     price: 420, img: IMG.cookies4, desc: "Crisp choux pastry filled with pastry cream, glazed in dark chocolate." },
-];
+
+// All unique categories in display order
+const ALL_CATEGORIES = [...new Set(MENU_DATA.map(p => p.category))];
+
 const REVIEWS = [
   { name: "Sana Malik",    img: IMG.rev1, stars: 5, role: "Food Blogger",     text: "Cremeo's sourdough has ruined every other bread for me. The crust shatters perfectly and the crumb is everything. I order twice a week now." },
   { name: "Ahmed Raza",    img: IMG.rev2, stars: 5, role: "Regular Customer", text: "Ordered a custom chocolate truffle cake for our anniversary. It was not just delicious — it was genuinely beautiful. The whole family was impressed." },
@@ -666,7 +783,7 @@ function HeroSection({ onDoorsReady }) {
               color: C.goldLight, marginBottom: 26,
               textShadow: "0 2px 12px rgba(0,0,0,0.6)",
             }}>
-              Est. 2019 &nbsp;&bull;&nbsp; Artisan Bakery
+              Est. 2026 &nbsp;&bull;&nbsp; Artisan Bakery
             </p>
             <h1 style={{
               fontFamily: FONT_DISPLAY, fontWeight: 300,
@@ -935,10 +1052,8 @@ function Navbar({ cartCount, onCartOpen, cartBouncing }) {
   };
 
   const navLinks = [
-    { label: "Menu",     id: "featured" },
-    { label: "Cakes",    id: "cakes"    },
-    { label: "Breads",   id: "breads"   },
-    { label: "Pastries", id: "cookies"  },
+    { label: "Featured", id: "featured" },
+    { label: "Menu",     id: "menu"     },
     { label: "About",    id: "about"    },
     { label: "Contact",  id: "contact"  },
   ];
@@ -1604,14 +1719,14 @@ function ContactSection() {
                 margin: "16px 0 24px",
               }}
             >
-              Come find us in
+              Come find us at
               <br />
-              <em style={{ fontStyle: "italic" }}>Askari 11</em>
+              <em style={{ fontStyle: "italic" }}>Axkari Xi, Lahore</em>
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               {[
-                { icon: <MapPin size={16} />, label: "Address", value: "Shop 7, Main Market, Sector C, Askari 11, Lahore" },
-                { icon: <Phone size={16} />, label: "Phone",   value: "+92 300 000 0000" },
+                { icon: <MapPin size={16} />, label: "Address", value: "Shop No. 10, First Floor (West), Commercial Market, Sector C, Axkari Xi, Lahore" },
+                { icon: <Phone size={16} />, label: "Phone / WhatsApp", value: "0313 5932718" },
                 { icon: <Mail size={16} />,  label: "Email",   value: "hello@cremeo.pk" },
                 { icon: <Clock size={16} />, label: "Hours",   value: "Mon – Sat: 7:00 AM – 9:00 PM\nSunday: 8:00 AM – 6:00 PM" },
               ].map((it) => (
@@ -1810,11 +1925,10 @@ function Footer() {
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {[
-                ["featured", "Menu"],
-                ["cakes",    "Cakes"],
-                ["breads",   "Breads"],
-                ["cookies",  "Pastries"],
+                ["featured", "Featured"],
+                ["menu",     "Full Menu"],
                 ["about",    "About Us"],
+                ["contact",  "Contact"],
               ].map(([id, label]) => (
                 <button
                   key={id}
@@ -2071,12 +2185,190 @@ function CartDrawer({ open, onClose, cart, updateQty, removeItem }) {
               Place Order (Call to Confirm)
             </button>
             <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.mist, textAlign: "center" }}>
-              Or call us at <strong>+92 300 000 0000</strong>
+              Or call / WhatsApp: <strong>0313 5932718</strong>
             </p>
           </div>
         )}
       </div>
     </>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   MENU SECTION — full browsable catalogue
+   Category selector · Search · Sort
+   All data driven from MENU_DATA.
+   API-ready: swap MENU_DATA import with a fetch.
+═══════════════════════════════════════════════ */
+function MenuSection({ onAdd, wishlist, toggleWish }) {
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [query,          setQuery]          = useState("");
+  const [sort,           setSort]           = useState("default");
+  const scrollRef = useRef(null);
+
+  const categories = ["All", ...ALL_CATEGORIES];
+
+  const visible = MENU_DATA
+    .filter((p) => {
+      const matchCat  = activeCategory === "All" || p.category === activeCategory;
+      const matchSearch = !query || p.name.toLowerCase().includes(query.toLowerCase()) ||
+                          p.category.toLowerCase().includes(query.toLowerCase());
+      return matchCat && matchSearch;
+    })
+    .sort((a, b) => {
+      if (sort === "price-asc")  return a.price - b.price;
+      if (sort === "price-desc") return b.price - a.price;
+      if (sort === "alpha")      return a.name.localeCompare(b.name);
+      return 0; // default — menu order
+    });
+
+  // When category changes, scroll category bar to active pill
+  const handleCat = (cat) => {
+    setActiveCategory(cat);
+    setQuery("");
+  };
+
+  return (
+    <section id="menu" className="section-pad" style={{ background: C.creamDeep, paddingTop: 64, paddingBottom: 72 }}>
+      <div style={{ maxWidth: 1260, margin: "0 auto" }}>
+
+        <SectionHeader
+          eyebrow="Our Full Menu"
+          title={<>Everything at <em style={{ fontStyle: "italic" }}>Cremeo</em></>}
+          sub="Browse by category, search for your favourite, or just scroll and discover."
+        />
+
+        {/* ── Search + Sort bar ── */}
+        <div
+          style={{
+            display: "flex", gap: 12, flexWrap: "wrap",
+            marginBottom: 28, alignItems: "center",
+          }}
+        >
+          {/* Search */}
+          <div style={{ position: "relative", flex: "1 1 220px", minWidth: 0 }}>
+            <input
+              type="search"
+              placeholder="Search products…"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setActiveCategory("All"); }}
+              style={{
+                width: "100%", padding: "11px 14px 11px 38px",
+                background: C.cream, border: `1px solid ${C.line}`,
+                borderRadius: 4, fontFamily: FONT_BODY, fontSize: 13,
+                color: C.espresso, outline: "none",
+                transition: "border-color 0.2s",
+              }}
+              onFocus={(e) => { e.target.style.borderColor = C.gold; }}
+              onBlur={(e)  => { e.target.style.borderColor = C.line; }}
+            />
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke={C.mist} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+            >
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer", color: C.mist, padding: 2,
+                }}
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Sort */}
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            style={{
+              padding: "11px 14px", background: C.cream,
+              border: `1px solid ${C.line}`, borderRadius: 4,
+              fontFamily: FONT_BODY, fontSize: 13, color: C.espresso,
+              outline: "none", cursor: "pointer", flexShrink: 0,
+              appearance: "none", paddingRight: 32,
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A6558' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 10px center",
+            }}
+          >
+            <option value="default">Default order</option>
+            <option value="price-asc">Price: Low → High</option>
+            <option value="price-desc">Price: High → Low</option>
+            <option value="alpha">A → Z</option>
+          </select>
+
+          {/* Result count */}
+          <span style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.mist, flexShrink: 0 }}>
+            {visible.length} item{visible.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {/* ── Category pills ── */}
+        <div
+          ref={scrollRef}
+          style={{
+            display: "flex", gap: 8, overflowX: "auto",
+            paddingBottom: 16, marginBottom: 36,
+            scrollbarWidth: "none", msOverflowStyle: "none",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <style>{`.cat-scroll::-webkit-scrollbar { display: none; }`}</style>
+          {categories.map((cat) => {
+            const active = cat === activeCategory;
+            return (
+              <button
+                key={cat}
+                onClick={() => handleCat(cat)}
+                style={{
+                  flexShrink: 0,
+                  padding: "8px 16px",
+                  borderRadius: 30,
+                  border: active ? `1.5px solid ${C.gold}` : `1.5px solid ${C.line}`,
+                  background: active ? C.espresso : C.cream,
+                  color: active ? C.goldLight : C.mist,
+                  fontFamily: FONT_BODY, fontSize: 12, fontWeight: active ? 600 : 400,
+                  letterSpacing: "0.04em",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Product grid ── */}
+        {visible.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 0", color: C.mist }}>
+            <p style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 300 }}>
+              No results for &ldquo;{query}&rdquo;
+            </p>
+            <button
+              onClick={() => { setQuery(""); setActiveCategory("All"); }}
+              style={{ marginTop: 16, background: "none", border: "none", cursor: "pointer", color: C.gold, fontFamily: FONT_BODY, fontSize: 13 }}
+            >
+              Clear search
+            </button>
+          </div>
+        ) : (
+          <div className="product-grid">
+            {visible.map((p) => (
+              <ProductCard key={p.id} product={p} onAdd={onAdd} wishlist={wishlist} toggleWish={toggleWish} />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -2145,41 +2437,7 @@ export default function App() {
 
         <FeaturedSection onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} />
 
-        <ProductSection
-          id="cakes"
-          eyebrow="Sweet celebrations"
-          title={<>Our <em style={{ fontStyle: "italic" }}>Cakes</em></>}
-          sub="Custom orders welcome. Each cake is baked to order and decorated by hand."
-          products={CAKES}
-          onAdd={addToCart}
-          wishlist={wishlist}
-          toggleWish={toggleWish}
-          bg={C.creamDeep}
-        />
-
-        <ProductSection
-          id="breads"
-          eyebrow="From the oven"
-          title={<>Artisan <em style={{ fontStyle: "italic" }}>Breads</em></>}
-          sub="Long fermented, stone-baked, and ready before you wake up."
-          products={BREADS}
-          onAdd={addToCart}
-          wishlist={wishlist}
-          toggleWish={toggleWish}
-          bg={C.cream}
-        />
-
-        <ProductSection
-          id="cookies"
-          eyebrow="Cookies & Pastries"
-          title={<>Small <em style={{ fontStyle: "italic" }}>Pleasures</em></>}
-          sub="Perfect with a cup of tea, or just on their own when nobody's looking."
-          products={COOKIES}
-          onAdd={addToCart}
-          wishlist={wishlist}
-          toggleWish={toggleWish}
-          bg={C.creamDeep}
-        />
+        <MenuSection onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} />
 
         <AboutSection />
         <ReviewsSection />
