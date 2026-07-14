@@ -555,8 +555,8 @@ function HeroSection({ onDoorsReady }) {
   const btnOp   = useTransform(progress, [0.70, 0.92], [0, 1]);
   const btnY    = useTransform(progress, [0.70, 0.92], [20, 0]);
 
-  /* ── Glow: fully opaque at start, fades as doors open ── */
-  const glowOp = useTransform(progress, [0, 0.85], [1, 0]);
+  /* ── Gap glow: visible at rest, fades quickly as doors begin to part ── */
+  const glowOp = useTransform(progress, [0, 0.25], [1, 0]);
 
   /* ── Scroll hint fades quickly ── */
   const hintOp = useTransform(progress, [0, 0.08], [1, 0]);
@@ -703,37 +703,43 @@ function HeroSection({ onDoorsReady }) {
         </div>
 
         {/*
-          ══ BACKGROUND GLOW ══
-          Lives at z:2 — above the hero photo (z:0) but BELOW the doors
-          (z:10). This means it shows through the crack between the doors
-          as warm light, covers the hero background while the doors are
-          mostly closed, and fades out as the doors swing fully open.
-          Moving it here (instead of inside the doors wrapper) ensures it
-          never renders on top of the door images.
+          ══ GAP GLOW ══
+          A narrow warm-light bleed visible only at the centre seam between
+          the two doors. It does NOT illuminate the door faces — the glow
+          stays within ~80px of the centreline and radiates outward with
+          very tight falloff. Fades to 0 by the time the doors have opened
+          ~25% of their travel, mimicking light leaking through a crack that
+          disappears once the gap widens enough.
+          z:11 — just above the door panels (z:10) so it renders over the
+          seam edge, never behind the wood.
         */}
         <motion.div
           aria-hidden="true"
           style={{
-            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-            zIndex: 2,
+            position: "absolute",
+            top: 0, bottom: 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 90,           /* tight — only the seam zone */
+            zIndex: 11,
             opacity: glowOp,
             pointerEvents: "none",
           }}
         >
-          {/* Solid base — fully covers the dark hero photo overlays so no black bleeds at edges */}
+          {/* Warm cream bloom — centred on the crack, falls off steeply */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "#1a0e04",
+            background: "radial-gradient(ellipse 100% 55% at 50% 38%, rgba(255,242,185,0.80) 0%, rgba(255,220,110,0.42) 30%, rgba(240,185,60,0.14) 60%, transparent 85%)",
           }} />
-          {/* Wide golden flood across the full screen */}
+          {/* Bright 2px hairline right at the seam */}
           <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 200% 140% at 50% 50%, rgba(218,190,90,0.92) 0%, rgba(195,158,55,0.85) 20%, rgba(150,108,22,0.70) 50%, rgba(60,30,5,0.60) 80%, transparent 100%)",
-          }} />
-          {/* Bright golden core at the door seam */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 22% 90% at 50% 50%, rgba(245,220,120,0.50) 0%, rgba(215,180,75,0.20) 55%, transparent 100%)",
+            position: "absolute",
+            top: "5%", bottom: "5%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 2,
+            background: "linear-gradient(to bottom, transparent 0%, rgba(255,250,205,0.95) 12%, rgba(255,250,205,0.95) 75%, transparent 100%)",
+            filter: "blur(0.5px)",
           }} />
         </motion.div>
 
@@ -764,13 +770,20 @@ function HeroSection({ onDoorsReady }) {
               willChange: "transform",
               transformStyle: "preserve-3d",
               filter: "drop-shadow(6px 0 20px rgba(0,0,0,0.5))",
+              overflow: "hidden",
             }}>
               <img
                 src={doorImages.left}
                 alt=""
                 aria-hidden="true"
                 style={{
-                  width: "100%", height: "100%",
+                  /* Crop ~8px from left & top/bottom edges to remove black outlines.
+                     Scale stays identical — we just clip the border artifact. */
+                  position: "absolute",
+                  top: -8, bottom: -8,
+                  left: -8, right: 0,
+                  width: "calc(100% + 8px)",
+                  height: "calc(100% + 16px)",
                   objectFit: "cover", objectPosition: "right center",
                   display: "block", userSelect: "none",
                 }}
@@ -794,13 +807,19 @@ function HeroSection({ onDoorsReady }) {
               willChange: "transform",
               transformStyle: "preserve-3d",
               filter: "drop-shadow(-6px 0 20px rgba(0,0,0,0.5))",
+              overflow: "hidden",
             }}>
               <img
                 src={doorImages.right}
                 alt=""
                 aria-hidden="true"
                 style={{
-                  width: "100%", height: "100%",
+                  /* Crop ~8px from right & top/bottom edges to remove black outlines. */
+                  position: "absolute",
+                  top: -8, bottom: -8,
+                  left: 0, right: -8,
+                  width: "calc(100% + 8px)",
+                  height: "calc(100% + 16px)",
                   objectFit: "cover", objectPosition: "left center",
                   display: "block", userSelect: "none",
                 }}
