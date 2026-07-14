@@ -555,8 +555,8 @@ function HeroSection({ onDoorsReady }) {
   const btnOp   = useTransform(progress, [0.70, 0.92], [0, 1]);
   const btnY    = useTransform(progress, [0.70, 0.92], [20, 0]);
 
-  /* ── Glow: fades out in sync with the doors (not before) ── */
-  const glowOp = useTransform(progress, [0.72, 0.98], [1, 0]);
+  /* ── Glow: starts fading as soon as doors begin to open, gone with doors ── */
+  const glowOp = useTransform(progress, [0, 0.85], [1, 0]);
 
   /* ── Scroll hint fades quickly ── */
   const hintOp = useTransform(progress, [0, 0.08], [1, 0]);
@@ -720,25 +720,15 @@ function HeroSection({ onDoorsReady }) {
             pointerEvents: "none",
           }}
         >
-          {/* Solid dark base — blocks hero photo bleed-through */}
+          {/* Wide golden flood — no black base so hero photo peeks through at edges */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "#1C0B03",
+            background: "radial-gradient(ellipse 150% 110% at 50% 50%, rgba(218,185,80,0.55) 0%, rgba(200,160,50,0.45) 25%, rgba(160,110,20,0.25) 55%, transparent 80%)",
           }} />
-          {/* Wide warm amber flood — illuminates the full area behind the doors */}
+          {/* Bright golden core at the seam */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 160% 120% at 50% 50%, rgba(220,148,42,0.95) 0%, rgba(180,100,20,0.98) 30%, rgba(100,48,8,1) 65%, rgba(20,8,2,1) 100%)",
-          }} />
-          {/* Secondary wide spread — pushes warm light into the corners */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 200% 100% at 50% 40%, rgba(255,175,60,0.18) 0%, rgba(180,90,10,0.08) 55%, transparent 80%)",
-          }} />
-          {/* Bright hot core at the seam — intense centre light source */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 18% 90% at 50% 50%, rgba(255,210,100,0.55) 0%, rgba(220,140,30,0.22) 50%, transparent 100%)",
+            background: "radial-gradient(ellipse 20% 85% at 50% 50%, rgba(240,210,110,0.40) 0%, rgba(210,175,70,0.15) 55%, transparent 100%)",
           }} />
         </motion.div>
 
