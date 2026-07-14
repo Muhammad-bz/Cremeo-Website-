@@ -555,7 +555,7 @@ function HeroSection({ onDoorsReady }) {
   const btnOp   = useTransform(progress, [0.70, 0.92], [0, 1]);
   const btnY    = useTransform(progress, [0.70, 0.92], [20, 0]);
 
-  /* ── Glow: starts fading as soon as doors begin to open, gone with doors ── */
+  /* ── Glow: fully opaque at start, fades as doors open ── */
   const glowOp = useTransform(progress, [0, 0.85], [1, 0]);
 
   /* ── Scroll hint fades quickly ── */
@@ -720,15 +720,20 @@ function HeroSection({ onDoorsReady }) {
             pointerEvents: "none",
           }}
         >
-          {/* Wide golden flood — no black base so hero photo peeks through at edges */}
+          {/* Solid base — fully covers the dark hero photo overlays so no black bleeds at edges */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 150% 110% at 50% 50%, rgba(218,185,80,0.55) 0%, rgba(200,160,50,0.45) 25%, rgba(160,110,20,0.25) 55%, transparent 80%)",
+            background: "#1a0e04",
           }} />
-          {/* Bright golden core at the seam */}
+          {/* Wide golden flood across the full screen */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 20% 85% at 50% 50%, rgba(240,210,110,0.40) 0%, rgba(210,175,70,0.15) 55%, transparent 100%)",
+            background: "radial-gradient(ellipse 200% 140% at 50% 50%, rgba(218,190,90,0.92) 0%, rgba(195,158,55,0.85) 20%, rgba(150,108,22,0.70) 50%, rgba(60,30,5,0.60) 80%, transparent 100%)",
+          }} />
+          {/* Bright golden core at the door seam */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "radial-gradient(ellipse 22% 90% at 50% 50%, rgba(245,220,120,0.50) 0%, rgba(215,180,75,0.20) 55%, transparent 100%)",
           }} />
         </motion.div>
 
