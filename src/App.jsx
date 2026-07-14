@@ -330,66 +330,56 @@ function useDoorImages() {
    ─ Fades out once doors are fully open
 ═══════════════════════════════════════════════ */
 function DoorBell({ doorsReady }) {
-  const [dropped, setDropped] = useState(false);
+  const [dropped,  setDropped]  = useState(false);
 
+  /* Read window scroll directly so we don't need a prop */
   const scrollRot = useMotionValue(0);
-  const scrollX   = useMotionValue(0); // drives the off-screen exit to the right
+  const scrollOp  = useMotionValue(1);
 
   useEffect(() => {
     /* Hero section is 250vh tall; bell swings out over first ~30% of that */
     const heroHeight = window.innerHeight * 2.5;
-    const swingEnd   = heroHeight * 0.30;
+    const swingEnd   = heroHeight * 0.30;  /* 30% of hero = bell fully off screen */
+    const fadeEnd    = heroHeight * 0.28;
 
     function onScroll() {
       const y = window.scrollY;
-      const t = Math.min(y / swingEnd, 1);
-
-      /*
-       * Ease-in-out quad: gives the bell a slow heavy start then builds
-       * momentum — feels like solid brass swinging on a real cord.
-       */
-      const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-
-      /* Rotate clockwise up to 70° to give a visual swing arc */
-      scrollRot.set(eased * 70);
-
-      /*
-       * Translate off the RIGHT edge of the viewport.
-       * window.innerWidth + 200 guarantees the bell clears the edge on
-       * every screen size — even ultrawide monitors.
-       * No opacity fade: the bell exits cleanly by leaving the screen.
-       */
-      scrollX.set(eased * (window.innerWidth + 200));
+      /* 0 → swingEnd maps to 0° → 90° rotation */
+      const rot = Math.min(y / swingEnd, 1) * 90;
+      /* fade: fully visible at y=0, gone by fadeEnd */
+      const op  = Math.max(0, 1 - y / fadeEnd);
+      scrollRot.set(rot);
+      scrollOp.set(op);
     }
 
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [scrollRot, scrollX]);
+  }, [scrollRot, scrollOp]);
 
   const handleDropComplete = useCallback(() => setDropped(true), []);
 
   return (
     /*
      * Outer wrapper — fixed in viewport, always above navbar (z:1001).
-     * originX/Y:"0%" keeps the pivot at the top-left of this element
-     * (= just right of the centre seam) so rotation + translate combine
-     * to produce a realistic pendulum-swings-off-frame motion.
+     * Pivot point is the very top (originY:"0%") so the whole cord+bell
+     * assembly swings like a pendulum from the door frame.
+     * left: calc(50% + 4px) = just right of the centre seam.
      */
     <motion.div
       aria-hidden="true"
       style={{
-        position:      "fixed",
-        top:           0,
-        left:          "calc(50% + 4px)",
-        zIndex:        1001,
-        originX:       "0%",
-        originY:       "0%",
-        rotate:        scrollRot,
-        x:             scrollX,
-        pointerEvents: "none",
-        display:       "flex",
-        flexDirection: "column",
-        alignItems:    "center",
+        position:       "fixed",
+        top:            0,
+        left:           "50%",
+        zIndex:         1001,
+        originX:        "0px",
+        originY:        "0px",
+        rotate:         scrollRot,
+        opacity:        scrollOp,
+        pointerEvents:  "none",
+        display:        "flex",
+        flexDirection:  "column",
+        alignItems:     "center",
       }}
     >
       {/* Phase-1 drop: springs down from above with overshoot */}
@@ -407,7 +397,7 @@ function DoorBell({ doorsReady }) {
         } : {}}
         onAnimationComplete={handleDropComplete}
       >
-        {/* Cord — single hairline */}
+        {/* Cord — single hairline, hangs from pivot at door seam */}
         <div style={{
           width:      1,
           height:     "clamp(50px, 7.5vh, 76px)",
@@ -422,10 +412,10 @@ function DoorBell({ doorsReady }) {
         */}
         <motion.div
           style={{
-            originX: "50%",
-            originY: "0%",
-            filter:  "drop-shadow(0 5px 14px rgba(0,0,0,0.5))",
-            marginTop: -1,
+            originX:    "50%",
+            originY:    "0%",
+            filter:     "drop-shadow(0 5px 14px rgba(0,0,0,0.5))",
+            marginTop:  -1,
           }}
           animate={dropped ? {
             rotate: [0, 3.8, -3, 3.2, -2.4, 2.6, -1.8, 2, -1.2, 1.4, -0.7, 0.8, 0],
@@ -662,7 +652,7 @@ function HeroSection({ onDoorsReady }) {
         {/* ── Brand text behind the doors ── */}
         <div style={{
           position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          zIndex: 1,
+          zIndex: 3,
           display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center",
           textAlign: "center", padding: "0 6%",
@@ -711,6 +701,37 @@ function HeroSection({ onDoorsReady }) {
             </button>
           </motion.div>
         </div>
+
+        {/*
+          ══ BACKGROUND GLOW ══
+          Lives at z:2 — above the hero photo (z:0) but BELOW the doors
+          (z:10). This means it shows through the crack between the doors
+          as warm light, covers the hero background while the doors are
+          mostly closed, and fades out as the doors swing fully open.
+          Moving it here (instead of inside the doors wrapper) ensures it
+          never renders on top of the door images.
+        */}
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 2,
+            opacity: glowOp,
+            pointerEvents: "none",
+          }}
+        >
+          {/* Solid base — zero bleed-through from the hero photo */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "#1C0B03",
+          }} />
+          {/* Warm amber radial fill */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "radial-gradient(ellipse 100% 100% at 50% 50%, rgba(190,118,32,0.90) 0%, rgba(135,74,14,0.97) 45%, rgba(20,8,2,1) 100%)",
+          }} />
+
+        </motion.div>
 
         {/* ══ THE DOORS ══ */}
         <motion.div
@@ -789,54 +810,6 @@ function HeroSection({ onDoorsReady }) {
               }} />
             </motion.div>
           </div>
-
-          {/*
-            ── BACKGROUND GLOW ──
-            A full-viewport warm amber radial glow that sits between the
-            hero image and the doors. It's fully visible on load (hiding
-            the hero photo), then fades away as the doors swing open and
-            the real background is revealed. This also removes any harsh
-            black seam — the centre just glows warmly.
-          */}
-          {/* Outer warm fill — covers the whole scene */}
-          <motion.div
-            style={{
-              position: "absolute",
-              top: 0, left: 0, right: 0, bottom: 0,
-              zIndex: 2,
-              opacity: glowOp,
-              background: "radial-gradient(ellipse 70% 80% at 50% 50%, rgba(200,130,40,0.72) 0%, rgba(160,90,20,0.88) 40%, rgba(40,18,4,0.97) 100%)",
-              pointerEvents: "none",
-            }}
-          />
-          {/* Centre shaft — warm golden beam where the doors meet */}
-          <motion.div
-            style={{
-              position: "absolute",
-              top: 0, bottom: 0,
-              left: "calc(50% - 40px)",
-              width: 80,
-              zIndex: 3,
-              opacity: glowOp,
-              background: "linear-gradient(to right, transparent 0%, rgba(255,200,80,0.18) 30%, rgba(255,220,120,0.55) 50%, rgba(255,200,80,0.18) 70%, transparent 100%)",
-              filter: "blur(8px)",
-              pointerEvents: "none",
-            }}
-          />
-          {/* Tight bright core at the seam */}
-          <motion.div
-            style={{
-              position: "absolute",
-              top: "5%", bottom: "5%",
-              left: "calc(50% - 8px)",
-              width: 16,
-              zIndex: 3,
-              opacity: glowOp,
-              background: "linear-gradient(to right, transparent, rgba(255,230,150,0.9), transparent)",
-              filter: "blur(4px)",
-              pointerEvents: "none",
-            }}
-          />
         </motion.div>
 
         {/* ── Scroll hint — raised higher (bottom: 80px) ── */}
