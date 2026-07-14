@@ -268,24 +268,43 @@ const IMG = {
 
 // Category image pools — matched by product type
 const CAT_IMGS = {
+  // Small personal-sized decorated cake
   "Bento Cake":    "https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=600&q=80&auto=format&fit=crop",
+  // Classic layered celebration cake
   "Cake 1 Pound":  "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&q=80&auto=format&fit=crop",
+  // Rich chocolate layer cake
   "Cake 1.5 Pound":"https://images.unsplash.com/photo-1535141192574-5d4897c12636?w=600&q=80&auto=format&fit=crop",
+  // Large decorated two-pound cake
   "Cake 2 Pound":  "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=600&q=80&auto=format&fit=crop",
-  "Dream Cake":    "https://images.unsplash.com/photo-1559620192-032c4bc4674e?w=600&q=80&auto=format&fit=crop",
+  // Molten lava / dream-style individual cake
+  "Dream Cake":    "https://images.unsplash.com/photo-1542826438-bd32f43d626f?w=600&q=80&auto=format&fit=crop",
+  // Flaky croissants and pastries tray
   "Pastries":      "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&q=80&auto=format&fit=crop",
+  // Glazed donuts with toppings
   "Donut":         "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=600&q=80&auto=format&fit=crop",
-  "Seasonal":      "https://images.unsplash.com/photo-1571115177098-24ec42ed204d?w=600&q=80&auto=format&fit=crop",
-  "Sundes":        "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80&auto=format&fit=crop",
+  // Mango / seasonal fruit cake
+  "Seasonal":      "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600&q=80&auto=format&fit=crop",
+  // Ice cream sundae with toppings
+  "Sundes":        "https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=600&q=80&auto=format&fit=crop",
+  // Dessert bowl with cream and toppings
   "Bowls":         "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80&auto=format&fit=crop",
-  "Cream Puff":    "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&q=80&auto=format&fit=crop",
+  // Choux / cream puffs — profiteroles
+  "Cream Puff":    "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&q=80&auto=format&fit=crop",
+  // Sliced loaf cake on a board
   "Loaf Cakes":    "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=600&q=80&auto=format&fit=crop",
+  // Fudgy loaded brownies
   "Loaded Brownie":"https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&q=80&auto=format&fit=crop",
+  // Decorated cupcakes with frosting
   "Cup Cake":      "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=600&q=80&auto=format&fit=crop",
+  // Colourful cake pops on sticks
   "Cake Pops":     "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=600&q=80&auto=format&fit=crop",
+  // Fruit / lemon tarts
   "Tarts":         "https://images.unsplash.com/photo-1621188988909-fbef0a88dc04?w=600&q=80&auto=format&fit=crop",
-  "Savory Foods":  "https://images.unsplash.com/photo-1568254183919-78a4f43a2877?w=600&q=80&auto=format&fit=crop",
-  "American Kuisine (Imported)": "https://images.unsplash.com/photo-1603046891744-1f21f27ae50a?w=600&q=80&auto=format&fit=crop",
+  // Savoury sandwich / wraps
+  "Savory Foods":  "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=600&q=80&auto=format&fit=crop",
+  // American-style cookies and pound cake
+  "American Kuisine (Imported)": "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=600&q=80&auto=format&fit=crop",
+  // Latte art coffee cup
   "Coffee":        "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80&auto=format&fit=crop",
 };
 const fallbackImg = (cat) => CAT_IMGS[cat] || IMG.feat1;
@@ -1548,7 +1567,7 @@ function AboutSection() {
               }}
             >
               Cremeo was born in a home kitchen in Askari 11, Sector C. What started as weekend
-              sourdough for neighbors grew into something we could not contain — so in 2019 we
+              sourdough for neighbors grew into something we could not contain — so in 2026 we
               opened our doors properly.
             </p>
             <p
