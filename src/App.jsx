@@ -555,8 +555,8 @@ function HeroSection({ onDoorsReady }) {
   const btnOp   = useTransform(progress, [0.70, 0.92], [0, 1]);
   const btnY    = useTransform(progress, [0.70, 0.92], [20, 0]);
 
-  /* ── Gap glow: stays fully visible until doors are ~20% open, then fades in one smooth sweep ── */
-  const glowOp = useTransform(progress, [0, 0.12, 0.38], [1, 1, 0]);
+  /* ── Gap glow: stays fully visible, fades only as doors near fully open ── */
+  const glowOp = useTransform(progress, [0, 0.55, 0.85], [1, 1, 0]);
 
   /* ── Scroll hint fades quickly ── */
   const hintOp = useTransform(progress, [0, 0.08], [1, 0]);
@@ -704,29 +704,21 @@ function HeroSection({ onDoorsReady }) {
 
         {/*
           ══ GAP GLOW ══
-          Original glow preserved — a narrow warm-light bleed at the centre seam.
-          z:11 — just above the door panels (z:10).
+          Wide soft bloom centred on the seam — full viewport width so the
+          radial falloff is gentle and never creates a hard stripe.
+          z:11 — just above the door panels.
         */}
         <motion.div
           aria-hidden="true"
           style={{
             position: "absolute",
-            top: 0, bottom: 0,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 90,
+            top: 0, left: 0, right: 0, bottom: 0,
             zIndex: 11,
             opacity: glowOp,
             pointerEvents: "none",
+            background: "radial-gradient(ellipse 35% 55% at 50% 42%, rgba(255,242,185,0.50) 0%, rgba(255,220,110,0.18) 50%, transparent 100%)",
           }}
-        >
-          {/* Warm cream bloom — tight seam glow only */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 100% 60% at 50% 38%, rgba(255,242,185,0.55) 0%, rgba(255,220,110,0.20) 45%, transparent 80%)",
-          }} />
-
-        </motion.div>
+        />
 
         {/*
           ══ FULL BACKGROUND GLOW ══
@@ -742,7 +734,7 @@ function HeroSection({ onDoorsReady }) {
             zIndex: 4,
             opacity: glowOp,
             pointerEvents: "none",
-            background: "radial-gradient(ellipse 60% 70% at 50% 45%, rgba(255,220,100,0.38) 0%, rgba(220,170,50,0.18) 40%, rgba(180,120,20,0.07) 70%, transparent 100%)",
+            background: "radial-gradient(ellipse 75% 80% at 50% 45%, rgba(255,225,110,0.55) 0%, rgba(220,170,50,0.28) 40%, rgba(180,120,20,0.10) 70%, transparent 100%)",
           }}
         />
 
