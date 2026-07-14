@@ -704,14 +704,8 @@ function HeroSection({ onDoorsReady }) {
 
         {/*
           ══ GAP GLOW ══
-          A narrow warm-light bleed visible only at the centre seam between
-          the two doors. It does NOT illuminate the door faces — the glow
-          stays within ~80px of the centreline and radiates outward with
-          very tight falloff. Fades to 0 by the time the doors have opened
-          ~25% of their travel, mimicking light leaking through a crack that
-          disappears once the gap widens enough.
-          z:11 — just above the door panels (z:10) so it renders over the
-          seam edge, never behind the wood.
+          Original glow preserved — a narrow warm-light bleed at the centre seam.
+          z:11 — just above the door panels (z:10).
         */}
         <motion.div
           aria-hidden="true"
@@ -720,7 +714,7 @@ function HeroSection({ onDoorsReady }) {
             top: 0, bottom: 0,
             left: "50%",
             transform: "translateX(-50%)",
-            width: 90,           /* tight — only the seam zone */
+            width: 90,
             zIndex: 11,
             opacity: glowOp,
             pointerEvents: "none",
@@ -742,6 +736,45 @@ function HeroSection({ onDoorsReady }) {
             filter: "blur(0.5px)",
           }} />
         </motion.div>
+
+        {/*
+          ══ DOOR-SURFACE CRACK LIGHT ══
+          Light that spills onto the INNER EDGES of each door — only near the
+          gap. Uses mix-blend-mode:screen so it brightens the door texture
+          without painting over it. Tight falloff (only ~120px from seam).
+          Fades to 0 as doors open (same glowOp transform as gap glow).
+          z:12 — above gap glow so it renders on the door face.
+        */}
+        {/* Left door inner-edge light */}
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0, bottom: 0,
+            right: "50%",
+            width: 120,
+            zIndex: 12,
+            opacity: glowOp,
+            pointerEvents: "none",
+            mixBlendMode: "screen",
+            background: "linear-gradient(to left, rgba(255,230,120,0.55) 0%, rgba(255,210,80,0.22) 35%, rgba(255,190,50,0.06) 70%, transparent 100%)",
+          }}
+        />
+        {/* Right door inner-edge light */}
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0, bottom: 0,
+            left: "50%",
+            width: 120,
+            zIndex: 12,
+            opacity: glowOp,
+            pointerEvents: "none",
+            mixBlendMode: "screen",
+            background: "linear-gradient(to right, rgba(255,230,120,0.55) 0%, rgba(255,210,80,0.22) 35%, rgba(255,190,50,0.06) 70%, transparent 100%)",
+          }}
+        />
 
         {/* ══ THE DOORS ══ */}
         <motion.div
@@ -777,13 +810,13 @@ function HeroSection({ onDoorsReady }) {
                 alt=""
                 aria-hidden="true"
                 style={{
-                  /* Crop ~8px from left & top/bottom edges to remove black outlines.
+                  /* Crop ~14px from left & top/bottom edges to remove black outlines.
                      Scale stays identical — we just clip the border artifact. */
                   position: "absolute",
-                  top: -8, bottom: -8,
-                  left: -8, right: 0,
-                  width: "calc(100% + 8px)",
-                  height: "calc(100% + 16px)",
+                  top: -14, bottom: -14,
+                  left: -14, right: 0,
+                  width: "calc(100% + 14px)",
+                  height: "calc(100% + 28px)",
                   objectFit: "cover", objectPosition: "right center",
                   display: "block", userSelect: "none",
                 }}
@@ -814,12 +847,12 @@ function HeroSection({ onDoorsReady }) {
                 alt=""
                 aria-hidden="true"
                 style={{
-                  /* Crop ~8px from right & top/bottom edges to remove black outlines. */
+                  /* Crop ~14px from right & top/bottom edges to remove black outlines. */
                   position: "absolute",
-                  top: -8, bottom: -8,
-                  left: 0, right: -8,
-                  width: "calc(100% + 8px)",
-                  height: "calc(100% + 16px)",
+                  top: -14, bottom: -14,
+                  left: 0, right: -14,
+                  width: "calc(100% + 14px)",
+                  height: "calc(100% + 28px)",
                   objectFit: "cover", objectPosition: "left center",
                   display: "block", userSelect: "none",
                 }}
