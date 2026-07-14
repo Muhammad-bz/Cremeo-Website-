@@ -316,8 +316,8 @@ function useDoorImages() {
   }, []);
 
   return {
-    left:  isMobile ? "/mobile/Left-door-Mobile.webp"  : "/desktop/Left-door-Dekstop.webp",
-    right: isMobile ? "/mobile/Right-door-mobile.webp" : "/desktop/Right-Door-Dekstop.webp",
+    left:  isMobile ? "/mobile/Left-Door-Mobile.webp"  : "/desktop/Left-Door-Dekstop.webp",
+    right: isMobile ? "/mobile/Right-Door-Mobile.webp" : "/desktop/Right-Door-Dekstop.webp",
   };
 }
 
