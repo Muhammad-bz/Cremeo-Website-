@@ -555,8 +555,8 @@ function HeroSection({ onDoorsReady }) {
   const btnOp   = useTransform(progress, [0.70, 0.92], [0, 1]);
   const btnY    = useTransform(progress, [0.70, 0.92], [20, 0]);
 
-  /* ── Gap glow: visible at rest, fades quickly as doors begin to part ── */
-  const glowOp = useTransform(progress, [0, 0.25], [1, 0]);
+  /* ── Gap glow: stays fully visible until doors are ~20% open, then fades in one smooth sweep ── */
+  const glowOp = useTransform(progress, [0, 0.12, 0.38], [1, 1, 0]);
 
   /* ── Scroll hint fades quickly ── */
   const hintOp = useTransform(progress, [0, 0.08], [1, 0]);
@@ -720,20 +720,20 @@ function HeroSection({ onDoorsReady }) {
             pointerEvents: "none",
           }}
         >
-          {/* Warm cream bloom — wider and stronger */}
+          {/* Warm cream bloom — tight seam glow only */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 100% 70% at 50% 40%, rgba(255,245,200,0.92) 0%, rgba(255,225,120,0.65) 25%, rgba(240,185,60,0.28) 55%, transparent 85%)",
+            background: "radial-gradient(ellipse 100% 60% at 50% 38%, rgba(255,242,185,0.55) 0%, rgba(255,220,110,0.20) 45%, transparent 80%)",
           }} />
-          {/* Soft glow sliver at the seam — heavily blurred so no hard line */}
+          {/* Very soft sliver — blurred wide so no hard edge */}
           <div style={{
             position: "absolute",
-            top: "3%", bottom: "3%",
+            top: "5%", bottom: "5%",
             left: "50%",
             transform: "translateX(-50%)",
-            width: 6,
-            background: "linear-gradient(to bottom, transparent 0%, rgba(255,248,210,0.70) 10%, rgba(255,248,210,0.70) 90%, transparent 100%)",
-            filter: "blur(3px)",
+            width: 8,
+            background: "linear-gradient(to bottom, transparent 0%, rgba(255,248,210,0.45) 12%, rgba(255,248,210,0.45) 88%, transparent 100%)",
+            filter: "blur(4px)",
           }} />
         </motion.div>
 
@@ -752,12 +752,12 @@ function HeroSection({ onDoorsReady }) {
             position: "absolute",
             top: 0, bottom: 0,
             right: "50%",
-            width: 200,
+            width: 100,
             zIndex: 12,
             opacity: glowOp,
             pointerEvents: "none",
             mixBlendMode: "screen",
-            background: "linear-gradient(to left, rgba(255,235,130,0.75) 0%, rgba(255,215,90,0.40) 30%, rgba(255,195,55,0.12) 65%, transparent 100%)",
+            background: "linear-gradient(to left, rgba(255,230,120,0.28) 0%, rgba(255,210,80,0.10) 50%, transparent 100%)",
           }}
         />
         {/* Right door inner-edge light */}
@@ -767,12 +767,12 @@ function HeroSection({ onDoorsReady }) {
             position: "absolute",
             top: 0, bottom: 0,
             left: "50%",
-            width: 200,
+            width: 100,
             zIndex: 12,
             opacity: glowOp,
             pointerEvents: "none",
             mixBlendMode: "screen",
-            background: "linear-gradient(to right, rgba(255,235,130,0.75) 0%, rgba(255,215,90,0.40) 30%, rgba(255,195,55,0.12) 65%, transparent 100%)",
+            background: "linear-gradient(to right, rgba(255,230,120,0.28) 0%, rgba(255,210,80,0.10) 50%, transparent 100%)",
           }}
         />
 
