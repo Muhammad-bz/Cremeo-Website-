@@ -322,95 +322,163 @@ function useDoorImages() {
 }
 
 /* ═══════════════════════════════════════════════
-   BELL COMPONENT — hangs from right door hinge area,
-   falls in then swings on load
+   DOOR BELL  — fixed overlay, always above navbar
+   ─ position: fixed so it sits above every z-index layer
+   ─ Drops with springy falling physics on load
+   ─ Idles with a gentle perpetual jiggle
+   ─ Scroll: pivots right and swings off-screen
+   ─ Fades out once doors are fully open
 ═══════════════════════════════════════════════ */
 function DoorBell({ doorsReady }) {
-  // Bell drops in from above after doors are ready, then swings
+  const [dropped, setDropped] = useState(false);
+
+  const scrollRot = useMotionValue(0);
+  const scrollX   = useMotionValue(0); // drives the off-screen exit to the right
+
+  useEffect(() => {
+    /* Hero section is 250vh tall; bell swings out over first ~30% of that */
+    const heroHeight = window.innerHeight * 2.5;
+    const swingEnd   = heroHeight * 0.30;
+
+    function onScroll() {
+      const y = window.scrollY;
+      const t = Math.min(y / swingEnd, 1);
+
+      /*
+       * Ease-in-out quad: gives the bell a slow heavy start then builds
+       * momentum — feels like solid brass swinging on a real cord.
+       */
+      const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+      /* Rotate clockwise up to 70° to give a visual swing arc */
+      scrollRot.set(eased * 70);
+
+      /*
+       * Translate off the RIGHT edge of the viewport.
+       * window.innerWidth + 200 guarantees the bell clears the edge on
+       * every screen size — even ultrawide monitors.
+       * No opacity fade: the bell exits cleanly by leaving the screen.
+       */
+      scrollX.set(eased * (window.innerWidth + 200));
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [scrollRot, scrollX]);
+
+  const handleDropComplete = useCallback(() => setDropped(true), []);
+
   return (
+    /*
+     * Outer wrapper — fixed in viewport, always above navbar (z:1001).
+     * originX/Y:"0%" keeps the pivot at the top-left of this element
+     * (= just right of the centre seam) so rotation + translate combine
+     * to produce a realistic pendulum-swings-off-frame motion.
+     */
     <motion.div
       aria-hidden="true"
       style={{
-        position: "absolute",
-        /* Sit on the right door, near the top-right area */
-        top: 0,
-        right: "calc(50% - 38px)",
-        zIndex: 15,
-        transformOrigin: "50% 0%",
+        position:      "fixed",
+        top:           0,
+        left:          "calc(50% + 4px)",
+        zIndex:        1001,
+        originX:       "0%",
+        originY:       "0%",
+        rotate:        scrollRot,
+        x:             scrollX,
         pointerEvents: "none",
-        display: "flex",
+        display:       "flex",
         flexDirection: "column",
-        alignItems: "center",
+        alignItems:    "center",
       }}
-      /* Phase 1: drop in from above */
-      initial={{ y: -120, opacity: 0 }}
-      animate={doorsReady ? {
-        y: 0,
-        opacity: 1,
-        transition: { delay: 0.2, duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-      } : {}}
     >
-      {/* String */}
+      {/* Phase-1 drop: springs down from above with overshoot */}
       <motion.div
-        style={{
-          width: 2,
-          height: 48,
-          background: "linear-gradient(to bottom, rgba(201,168,76,0.9), rgba(201,168,76,0.4))",
-          borderRadius: 1,
-          transformOrigin: "50% 0%",
-        }}
-        /* Phase 2: swing after drop */
+        style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+        initial={{ y: -240, opacity: 0 }}
         animate={doorsReady ? {
-          rotate: [0, 18, -14, 10, -7, 4, -2, 0],
+          y:       0,
+          opacity: 1,
           transition: {
-            delay: 0.9,
-            duration: 2.8,
-            ease: "easeInOut",
-            times: [0, 0.15, 0.32, 0.48, 0.62, 0.74, 0.87, 1],
+            delay:    0.15,
+            duration: 0.95,
+            ease:     [0.34, 1.42, 0.64, 1],   /* overshoot spring */
           },
         } : {}}
-      />
-      {/* Bell body */}
-      <motion.div
-        style={{
-          transformOrigin: "50% 0%",
-          filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))",
-        }}
-        animate={doorsReady ? {
-          rotate: [0, 18, -14, 10, -7, 4, -2, 0],
-          transition: {
-            delay: 0.9,
-            duration: 2.8,
-            ease: "easeInOut",
-            times: [0, 0.15, 0.32, 0.48, 0.62, 0.74, 0.87, 1],
-          },
-        } : {}}
+        onAnimationComplete={handleDropComplete}
       >
-        <svg width="28" height="32" viewBox="0 0 28 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Bell body */}
-          <path
-            d="M14 4 C6 4 3 10 3 17 L3 24 L25 24 L25 17 C25 10 22 4 14 4Z"
-            fill="url(#bellGrad)"
-            stroke="rgba(201,168,76,0.6)"
-            strokeWidth="0.5"
-          />
-          {/* Bell top knob */}
-          <rect x="11.5" y="1" width="5" height="4" rx="2.5" fill="#C9A84C" />
-          {/* Bell rim */}
-          <path d="M1 24 Q14 27 27 24" stroke="#C9A84C" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          {/* Clapper */}
-          <circle cx="14" cy="27" r="2.5" fill="#A87040" />
-          <line x1="14" y1="24" x2="14" y2="27" stroke="#A87040" strokeWidth="1.2" />
-          {/* Shine */}
-          <ellipse cx="10" cy="12" rx="2.5" ry="4" fill="rgba(255,255,255,0.18)" transform="rotate(-15 10 12)" />
-          <defs>
-            <linearGradient id="bellGrad" x1="3" y1="4" x2="25" y2="24" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#E2C97E" />
-              <stop offset="40%" stopColor="#C9A84C" />
-              <stop offset="100%" stopColor="#8B6914" />
-            </linearGradient>
-          </defs>
-        </svg>
+        {/* Cord — single hairline */}
+        <div style={{
+          width:      1,
+          height:     "clamp(50px, 7.5vh, 76px)",
+          background: "linear-gradient(to bottom, rgba(130,90,30,0.92) 0%, rgba(110,75,22,0.4) 100%)",
+          flexShrink: 0,
+        }} />
+
+        {/*
+          Phase-2 idle jiggle — starts only after drop settles.
+          3–4° oscillation, decaying keyframes, repeats with a pause.
+          transformOrigin top-centre so it pivots from where cord meets bell.
+        */}
+        <motion.div
+          style={{
+            originX: "50%",
+            originY: "0%",
+            filter:  "drop-shadow(0 5px 14px rgba(0,0,0,0.5))",
+            marginTop: -1,
+          }}
+          animate={dropped ? {
+            rotate: [0, 3.8, -3, 3.2, -2.4, 2.6, -1.8, 2, -1.2, 1.4, -0.7, 0.8, 0],
+            transition: {
+              duration:    7,
+              ease:        "easeInOut",
+              repeat:      Infinity,
+              repeatDelay: 3,
+              times: [0, 0.07, 0.15, 0.23, 0.31, 0.40, 0.49, 0.58, 0.67, 0.76, 0.84, 0.92, 1],
+            },
+          } : {}}
+        >
+          {/* ── Elegant minimal bell ── */}
+          <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              {/* Side-lit brass: highlight left, warm centre, shadow right */}
+              <linearGradient id="b-body" x1="0" y1="0" x2="36" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#A07025" />
+                <stop offset="38%"  stopColor="#E8C96A" />
+                <stop offset="100%" stopColor="#6B4812" />
+              </linearGradient>
+              {/* Soft vertical sheen on dome */}
+              <linearGradient id="b-sheen" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="rgba(255,255,255,0.16)" />
+                <stop offset="55%"  stopColor="rgba(255,255,255,0.04)" />
+                <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+              </linearGradient>
+              {/* Rim catches light at its lip */}
+              <linearGradient id="b-rim" x1="0" y1="0" x2="36" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#7A5215" />
+                <stop offset="30%"  stopColor="#EDD476" />
+                <stop offset="70%"  stopColor="#EDD476" />
+                <stop offset="100%" stopColor="#7A5215" />
+              </linearGradient>
+            </defs>
+
+            {/* Mounting knob */}
+            <ellipse cx="18" cy="3.2" rx="3" ry="3.2" fill="#9A6E20" />
+            <ellipse cx="17.2" cy="2.3" rx="1.1" ry="1.3" fill="rgba(255,255,255,0.22)" />
+
+            {/* Bell dome — clean single path */}
+            <path d="M18 6 C9 6 3 13 3 21 L3 32 L33 32 L33 21 C33 13 27 6 18 6 Z" fill="url(#b-body)" />
+            <path d="M18 6 C9 6 3 13 3 21 L3 32 L33 32 L33 21 C33 13 27 6 18 6 Z" fill="url(#b-sheen)" />
+
+            {/* Rim */}
+            <path d="M1 32 Q18 37.5 35 32" stroke="url(#b-rim)" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+
+            {/* Clapper */}
+            <line x1="18" y1="32" x2="18" y2="37.5" stroke="#7A5215" strokeWidth="1.1" strokeLinecap="round" />
+            <circle cx="18" cy="40.5" r="3" fill="#8B6018" />
+            <circle cx="16.8" cy="39.4" r="0.9" fill="rgba(255,255,255,0.2)" />
+          </svg>
+        </motion.div>
       </motion.div>
     </motion.div>
   );
@@ -419,7 +487,7 @@ function DoorBell({ doorsReady }) {
 /* ═══════════════════════════════════════════════
    HERO SECTION — CINEMATIC IMAGE DOOR REVEAL
 ═══════════════════════════════════════════════ */
-function HeroSection() {
+function HeroSection({ onDoorsReady }) {
   const containerRef = useRef(null);
   const doorImages   = useDoorImages();
 
@@ -431,6 +499,11 @@ function HeroSection() {
   const [leftLoaded,  setLeftLoaded]  = useState(false);
   const [rightLoaded, setRightLoaded] = useState(false);
   const doorsReady = leftLoaded && rightLoaded;
+
+  useEffect(() => {
+    if (doorsReady && onDoorsReady) onDoorsReady();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorsReady]);
 
   // Preload images imperatively so we know exact load timing
   useEffect(() => {
@@ -714,9 +787,6 @@ function HeroSection() {
                 pointerEvents: "none",
                 background: "linear-gradient(to right, rgba(0,0,0,0.22) 0%, transparent 18%)",
               }} />
-
-              {/* ── Bell hangs from the right door's inner top edge ── */}
-              <DoorBell doorsReady={doorsReady} />
             </motion.div>
           </div>
 
@@ -1988,6 +2058,7 @@ export default function App() {
   const [cartBouncing, setCartBouncing] = useState(false);
   const [cart,         setCart]         = useState([]);
   const [wishlist,     setWishlist]     = useState(new Set());
+  const [doorsReady,   setDoorsReady]   = useState(false);
 
   useReveal();
 
@@ -2026,6 +2097,12 @@ export default function App() {
     <>
       <GlobalStyles />
 
+      {/*
+        Bell is fixed-position at z:1001, above the navbar (z:1000).
+        Rendered here in App so it's never clipped by any stacking context.
+      */}
+      <DoorBell doorsReady={doorsReady} />
+
       <Navbar
         cartCount={cartCount}
         onCartOpen={() => setCartOpen(true)}
@@ -2033,7 +2110,7 @@ export default function App() {
       />
 
       <main>
-        <HeroSection />
+        <HeroSection onDoorsReady={() => setDoorsReady(true)} />
         <TrustStrip />
 
         <FeaturedSection onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} />
