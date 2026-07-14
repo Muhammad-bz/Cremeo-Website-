@@ -322,11 +322,132 @@ function useDoorImages() {
 }
 
 /* ═══════════════════════════════════════════════
+   BELL COMPONENT — hangs from right door hinge area,
+   falls in then swings on load
+═══════════════════════════════════════════════ */
+function DoorBell({ doorsReady }) {
+  // Bell drops in from above after doors are ready, then swings
+  return (
+    <motion.div
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        /* Sit on the right door, near the top-right area */
+        top: 0,
+        right: "calc(50% - 38px)",
+        zIndex: 15,
+        transformOrigin: "50% 0%",
+        pointerEvents: "none",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}
+      /* Phase 1: drop in from above */
+      initial={{ y: -120, opacity: 0 }}
+      animate={doorsReady ? {
+        y: 0,
+        opacity: 1,
+        transition: { delay: 0.2, duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+      } : {}}
+    >
+      {/* String */}
+      <motion.div
+        style={{
+          width: 2,
+          height: 48,
+          background: "linear-gradient(to bottom, rgba(201,168,76,0.9), rgba(201,168,76,0.4))",
+          borderRadius: 1,
+          transformOrigin: "50% 0%",
+        }}
+        /* Phase 2: swing after drop */
+        animate={doorsReady ? {
+          rotate: [0, 18, -14, 10, -7, 4, -2, 0],
+          transition: {
+            delay: 0.9,
+            duration: 2.8,
+            ease: "easeInOut",
+            times: [0, 0.15, 0.32, 0.48, 0.62, 0.74, 0.87, 1],
+          },
+        } : {}}
+      />
+      {/* Bell body */}
+      <motion.div
+        style={{
+          transformOrigin: "50% 0%",
+          filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))",
+        }}
+        animate={doorsReady ? {
+          rotate: [0, 18, -14, 10, -7, 4, -2, 0],
+          transition: {
+            delay: 0.9,
+            duration: 2.8,
+            ease: "easeInOut",
+            times: [0, 0.15, 0.32, 0.48, 0.62, 0.74, 0.87, 1],
+          },
+        } : {}}
+      >
+        <svg width="28" height="32" viewBox="0 0 28 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Bell body */}
+          <path
+            d="M14 4 C6 4 3 10 3 17 L3 24 L25 24 L25 17 C25 10 22 4 14 4Z"
+            fill="url(#bellGrad)"
+            stroke="rgba(201,168,76,0.6)"
+            strokeWidth="0.5"
+          />
+          {/* Bell top knob */}
+          <rect x="11.5" y="1" width="5" height="4" rx="2.5" fill="#C9A84C" />
+          {/* Bell rim */}
+          <path d="M1 24 Q14 27 27 24" stroke="#C9A84C" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          {/* Clapper */}
+          <circle cx="14" cy="27" r="2.5" fill="#A87040" />
+          <line x1="14" y1="24" x2="14" y2="27" stroke="#A87040" strokeWidth="1.2" />
+          {/* Shine */}
+          <ellipse cx="10" cy="12" rx="2.5" ry="4" fill="rgba(255,255,255,0.18)" transform="rotate(-15 10 12)" />
+          <defs>
+            <linearGradient id="bellGrad" x1="3" y1="4" x2="25" y2="24" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#E2C97E" />
+              <stop offset="40%" stopColor="#C9A84C" />
+              <stop offset="100%" stopColor="#8B6914" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
    HERO SECTION — CINEMATIC IMAGE DOOR REVEAL
 ═══════════════════════════════════════════════ */
 function HeroSection() {
   const containerRef = useRef(null);
   const doorImages   = useDoorImages();
+
+  /*
+   * LOADING GATE — hide everything until BOTH door images have loaded.
+   * This prevents the hero background from being visible before the
+   * doors are painted on screen.
+   */
+  const [leftLoaded,  setLeftLoaded]  = useState(false);
+  const [rightLoaded, setRightLoaded] = useState(false);
+  const doorsReady = leftLoaded && rightLoaded;
+
+  // Preload images imperatively so we know exact load timing
+  useEffect(() => {
+    setLeftLoaded(false);
+    setRightLoaded(false);
+
+    const imgL = new Image();
+    const imgR = new Image();
+    imgL.onload  = () => setLeftLoaded(true);
+    imgL.onerror = () => setLeftLoaded(true);  // fail-open so site still works
+    imgR.onload  = () => setRightLoaded(true);
+    imgR.onerror = () => setRightLoaded(true);
+    imgL.src = doorImages.left;
+    imgR.src = doorImages.right;
+  // Re-run when the image URLs change (i.e. viewport crosses 768px breakpoint)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorImages.left, doorImages.right]);
 
   /* ── Scroll-linked progress (0 → 1 as the 250vh section scrolls) ── */
   const { scrollYProgress } = useScroll({
@@ -334,33 +455,22 @@ function HeroSection() {
     offset: ["start start", "end end"],
   });
 
-  /*
-   * Mirror scrollYProgress into a plain motion value so downstream
-   * useTransform calls can be composed freely. This also makes scroll
-   * fully reversible — both up and down animate correctly.
-   */
   const progress = useMotionValue(0);
   useMotionValueEvent(scrollYProgress, "change", (v) => progress.set(v));
 
-  /* ── Auto-invite: doors crack open ~12° on load after 0.6s ── */
+  /* ── Auto-invite: doors crack open ~12° after images load ── */
   const autoNudge = useMotionValue(0);
   useEffect(() => {
+    if (!doorsReady) return;
     const ctrl = animate(autoNudge, 1, {
-      delay: 0.6,
+      delay: 0.3,
       duration: 2.2,
-      ease: [0.16, 1, 0.3, 1], // heavy, slow start → natural swing
+      ease: [0.16, 1, 0.3, 1],
     });
     return () => ctrl.stop();
-    // autoNudge is a stable ref — effect runs once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorsReady]);
 
-  /*
-   * FIX: useTransform with an array of MotionValues + a combiner function
-   * is the correct Framer Motion v11 API.  The previous single-MV
-   * useTransform(progress, [0,1], [0, -MAX_DEG]) approach can't blend
-   * autoNudge in.  This form compiles and works correctly.
-   */
   const NUDGE_DEG = 12;
   const MAX_DEG   = 100;
 
@@ -376,14 +486,14 @@ function HeroSection() {
   /* ── Background parallax zoom ── */
   const bgScale = useTransform(progress, [0, 1], [1.08, 1.0]);
 
-  /* ── Hero text: fades in when doors are ~60 % open ── */
+  /* ── Hero text fades in as doors open ── */
   const brandOp = useTransform(progress, [0.55, 0.82], [0, 1]);
   const brandY  = useTransform(progress, [0.55, 0.82], [40, 0]);
   const btnOp   = useTransform(progress, [0.70, 0.92], [0, 1]);
   const btnY    = useTransform(progress, [0.70, 0.92], [20, 0]);
 
-  /* ── Centre seam shadow fades as gap grows ── */
-  const seamOp = useTransform(progress, [0, 0.18], [1, 0]);
+  /* ── Glow: starts fully visible covering the bg, fades out as doors open ── */
+  const glowOp = useTransform(progress, [0, 0.55], [1, 0]);
 
   /* ── Scroll hint fades quickly ── */
   const hintOp = useTransform(progress, [0, 0.08], [1, 0]);
@@ -395,19 +505,56 @@ function HeroSection() {
     document.getElementById("featured")?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    /*
-     * The section is 250 vh tall so the sticky viewport stays pinned
-     * long enough for the full door-open travel.
-     */
     <section
       ref={containerRef}
       style={{ height: "250vh", position: "relative" }}
       aria-label="Welcome to Cremeo"
     >
-      {/* ══ STICKY VIEWPORT — everything inside is fixed to screen ══ */}
       <div style={{ position: "sticky", top: 0, height: "100vh", overflow: "hidden" }}>
 
-        {/* ── Hero background image (revealed behind the doors) ── */}
+        {/*
+          ── LOADING COVER ──
+          Solid espresso screen shown until both door images are loaded.
+          Fades out once ready so there's never a flash of the hero behind.
+        */}
+        <motion.div
+          aria-hidden="true"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: doorsReady ? 0 : 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          style={{
+            position: "absolute",
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: "#2E1A0E",
+            zIndex: 50,
+            pointerEvents: doorsReady ? "none" : "all",
+          }}
+        >
+          {/* Subtle pulsing logo while loading */}
+          <div style={{
+            position: "absolute", top: "50%", left: "50%",
+            transform: "translate(-50%, -50%)",
+            textAlign: "center",
+          }}>
+            <p style={{
+              fontFamily: FONT_DISPLAY,
+              fontSize: "clamp(32px, 8vw, 56px)",
+              fontWeight: 300,
+              color: C.gold,
+              letterSpacing: "0.18em",
+              animation: "pulse 1.8s ease infinite",
+            }}>
+              CREMEO
+            </p>
+            <div style={{
+              width: 36, height: 1,
+              background: `linear-gradient(to right, transparent, ${C.gold}, transparent)`,
+              margin: "12px auto 0",
+            }} />
+          </div>
+        </motion.div>
+
+        {/* ── Hero background ── */}
         <motion.div
           style={{
             position: "absolute",
@@ -424,117 +571,70 @@ function HeroSection() {
               width: "100%", height: "100%",
               objectFit: "cover", objectPosition: "center",
               display: "block",
-              userSelect: "none",
-              pointerEvents: "none",
+              userSelect: "none", pointerEvents: "none",
             }}
             draggable={false}
           />
-          {/* Dark warm overlay */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              top: 0, left: 0, right: 0, bottom: 0,
-              background: "rgba(20,8,2,0.45)",
-              pointerEvents: "none",
-            }}
-          />
-          {/* Cinematic vignette */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              top: 0, left: 0, right: 0, bottom: 0,
-              background: "radial-gradient(ellipse 80% 75% at 50% 50%, transparent 35%, rgba(20,8,2,0.35) 100%)",
-              pointerEvents: "none",
-            }}
-          />
+          <div aria-hidden="true" style={{
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(20,8,2,0.45)", pointerEvents: "none",
+          }} />
+          <div aria-hidden="true" style={{
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+            background: "radial-gradient(ellipse 80% 75% at 50% 50%, transparent 35%, rgba(20,8,2,0.35) 100%)",
+            pointerEvents: "none",
+          }} />
         </motion.div>
 
-        {/* ── Brand text centred behind the doors ── */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            zIndex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-            padding: "0 6%",
-            pointerEvents: "none",
-          }}
-        >
+        {/* ── Brand text behind the doors ── */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 1,
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          textAlign: "center", padding: "0 6%",
+          pointerEvents: "none",
+        }}>
           <motion.div style={{ opacity: brandOp, y: brandY }}>
-            <p
-              style={{
-                fontFamily: FONT_BODY,
-                fontSize: "clamp(9px, 1.1vw, 11px)",
-                letterSpacing: "0.34em",
-                textTransform: "uppercase",
-                color: C.goldLight,
-                marginBottom: 26,
-                textShadow: "0 2px 12px rgba(0,0,0,0.6)",
-              }}
-            >
+            <p style={{
+              fontFamily: FONT_BODY,
+              fontSize: "clamp(9px, 1.1vw, 11px)",
+              letterSpacing: "0.34em", textTransform: "uppercase",
+              color: C.goldLight, marginBottom: 26,
+              textShadow: "0 2px 12px rgba(0,0,0,0.6)",
+            }}>
               Est. 2019 &nbsp;&bull;&nbsp; Artisan Bakery
             </p>
-
-            <h1
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontWeight: 300,
-                fontSize: "clamp(58px, 13.5vw, 144px)",
-                lineHeight: 0.88,
-                color: C.cream,
-                letterSpacing: "0.12em",
-                marginBottom: 18,
-                textShadow: "0 4px 32px rgba(0,0,0,0.55)",
-              }}
-            >
+            <h1 style={{
+              fontFamily: FONT_DISPLAY, fontWeight: 300,
+              fontSize: "clamp(58px, 13.5vw, 144px)",
+              lineHeight: 0.88, color: C.cream,
+              letterSpacing: "0.12em", marginBottom: 18,
+              textShadow: "0 4px 32px rgba(0,0,0,0.55)",
+            }}>
               CREMEO
             </h1>
-
-            {/* Gold rule */}
-            <div
-              style={{
-                width: 52, height: 1,
-                background: `linear-gradient(to right, transparent, ${C.gold}, transparent)`,
-                margin: "0 auto 20px",
-              }}
-            />
-
-            <p
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontStyle: "italic",
-                fontWeight: 300,
-                fontSize: "clamp(15px, 2.6vw, 27px)",
-                color: C.goldLight,
-                letterSpacing: "0.07em",
-                marginBottom: 54,
-                textShadow: "0 2px 16px rgba(0,0,0,0.5)",
-              }}
-            >
+            <div style={{
+              width: 52, height: 1,
+              background: `linear-gradient(to right, transparent, ${C.gold}, transparent)`,
+              margin: "0 auto 20px",
+            }} />
+            <p style={{
+              fontFamily: FONT_DISPLAY, fontStyle: "italic", fontWeight: 300,
+              fontSize: "clamp(15px, 2.6vw, 27px)",
+              color: C.goldLight, letterSpacing: "0.07em", marginBottom: 54,
+              textShadow: "0 2px 16px rgba(0,0,0,0.5)",
+            }}>
               Premium Desserts
             </p>
           </motion.div>
-
-          {/* CTA button */}
           <motion.div style={{ opacity: btnOp, y: btnY, pointerEvents: "auto" }}>
             <button
               className="btn-gold"
               onClick={scrollToMenu}
-              style={{
-                fontSize: 11,
-                letterSpacing: "0.16em",
-                padding: "16px 40px",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
-              }}
+              style={{ fontSize: 11, letterSpacing: "0.16em", padding: "16px 40px", boxShadow: "0 8px 32px rgba(0,0,0,0.35)" }}
             >
-              Explore Menu{" "}
-              <ArrowRight size={13} style={{ marginLeft: 4 }} />
+              Explore Menu <ArrowRight size={13} style={{ marginLeft: 4 }} />
             </button>
           </motion.div>
         </div>
@@ -543,122 +643,138 @@ function HeroSection() {
         <motion.div
           aria-hidden="true"
           style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
             zIndex: 10,
             opacity: doorsOp,
             pointerEvents: "none",
           }}
         >
-          {/* Perspective wrapper gives the doors 3-D depth */}
-          <div
-            style={{
+          {/* Perspective wrapper */}
+          <div style={{
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+            perspective: "clamp(900px, 130vw, 1600px)",
+            perspectiveOrigin: "50% 50%",
+          }}>
+
+            {/* ── Left door ── */}
+            <motion.div style={{
               position: "absolute",
-              top: 0, left: 0, right: 0, bottom: 0,
-              perspective: "clamp(900px, 130vw, 1600px)",
-              perspectiveOrigin: "50% 50%",
-            }}
-          >
-            {/* ── Left door — hinges on the LEFT edge ── */}
-            <motion.div
-              style={{
-                position: "absolute",
-                left: 0, top: 0, bottom: 0,
-                width: "50%",
-                rotateY: leftRotate,
-                transformOrigin: "0% 50%",
-                willChange: "transform",
-                transformStyle: "preserve-3d",
-                filter: "drop-shadow(8px 0 28px rgba(0,0,0,0.55))",
-              }}
-            >
+              left: 0, top: 0, bottom: 0,
+              width: "50%",
+              rotateY: leftRotate,
+              transformOrigin: "0% 50%",
+              willChange: "transform",
+              transformStyle: "preserve-3d",
+              filter: "drop-shadow(6px 0 20px rgba(0,0,0,0.5))",
+            }}>
               <img
                 src={doorImages.left}
                 alt=""
                 aria-hidden="true"
                 style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  /* Keep the inner (right) edge flush with the centre seam */
-                  objectPosition: "right center",
-                  display: "block",
-                  userSelect: "none",
+                  width: "100%", height: "100%",
+                  objectFit: "cover", objectPosition: "right center",
+                  display: "block", userSelect: "none",
                 }}
                 draggable={false}
               />
               {/* Inner-edge depth shading */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0, left: 0, right: 0, bottom: 0,
-                  pointerEvents: "none",
-                  background: "linear-gradient(to left, rgba(0,0,0,0.28) 0%, transparent 22%)",
-                }}
-              />
+              <div style={{
+                position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                pointerEvents: "none",
+                background: "linear-gradient(to left, rgba(0,0,0,0.22) 0%, transparent 18%)",
+              }} />
             </motion.div>
 
-            {/* ── Right door — hinges on the RIGHT edge ── */}
-            <motion.div
-              style={{
-                position: "absolute",
-                right: 0, top: 0, bottom: 0,
-                width: "50%",
-                rotateY: rightRotate,
-                transformOrigin: "100% 50%",
-                willChange: "transform",
-                transformStyle: "preserve-3d",
-                filter: "drop-shadow(-8px 0 28px rgba(0,0,0,0.55))",
-              }}
-            >
+            {/* ── Right door ── */}
+            <motion.div style={{
+              position: "absolute",
+              right: 0, top: 0, bottom: 0,
+              width: "50%",
+              rotateY: rightRotate,
+              transformOrigin: "100% 50%",
+              willChange: "transform",
+              transformStyle: "preserve-3d",
+              filter: "drop-shadow(-6px 0 20px rgba(0,0,0,0.5))",
+            }}>
               <img
                 src={doorImages.right}
                 alt=""
                 aria-hidden="true"
                 style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  /* Keep the inner (left) edge flush with the centre seam */
-                  objectPosition: "left center",
-                  display: "block",
-                  userSelect: "none",
+                  width: "100%", height: "100%",
+                  objectFit: "cover", objectPosition: "left center",
+                  display: "block", userSelect: "none",
                 }}
                 draggable={false}
               />
               {/* Inner-edge depth shading */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0, left: 0, right: 0, bottom: 0,
-                  pointerEvents: "none",
-                  background: "linear-gradient(to right, rgba(0,0,0,0.28) 0%, transparent 22%)",
-                }}
-              />
+              <div style={{
+                position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                pointerEvents: "none",
+                background: "linear-gradient(to right, rgba(0,0,0,0.22) 0%, transparent 18%)",
+              }} />
+
+              {/* ── Bell hangs from the right door's inner top edge ── */}
+              <DoorBell doorsReady={doorsReady} />
             </motion.div>
           </div>
 
-          {/* Centre seam shadow — fades as the gap opens */}
+          {/*
+            ── BACKGROUND GLOW ──
+            A full-viewport warm amber radial glow that sits between the
+            hero image and the doors. It's fully visible on load (hiding
+            the hero photo), then fades away as the doors swing open and
+            the real background is revealed. This also removes any harsh
+            black seam — the centre just glows warmly.
+          */}
+          {/* Outer warm fill — covers the whole scene */}
+          <motion.div
+            style={{
+              position: "absolute",
+              top: 0, left: 0, right: 0, bottom: 0,
+              zIndex: 2,
+              opacity: glowOp,
+              background: "radial-gradient(ellipse 70% 80% at 50% 50%, rgba(200,130,40,0.72) 0%, rgba(160,90,20,0.88) 40%, rgba(40,18,4,0.97) 100%)",
+              pointerEvents: "none",
+            }}
+          />
+          {/* Centre shaft — warm golden beam where the doors meet */}
           <motion.div
             style={{
               position: "absolute",
               top: 0, bottom: 0,
-              left: "calc(50% - 2px)",
-              width: 4,
-              zIndex: 11,
-              background:
-                "linear-gradient(to bottom, rgba(0,0,0,0.70) 0%, rgba(0,0,0,0.92) 50%, rgba(0,0,0,0.70) 100%)",
-              opacity: seamOp,
+              left: "calc(50% - 40px)",
+              width: 80,
+              zIndex: 3,
+              opacity: glowOp,
+              background: "linear-gradient(to right, transparent 0%, rgba(255,200,80,0.18) 30%, rgba(255,220,120,0.55) 50%, rgba(255,200,80,0.18) 70%, transparent 100%)",
+              filter: "blur(8px)",
+              pointerEvents: "none",
+            }}
+          />
+          {/* Tight bright core at the seam */}
+          <motion.div
+            style={{
+              position: "absolute",
+              top: "5%", bottom: "5%",
+              left: "calc(50% - 8px)",
+              width: 16,
+              zIndex: 3,
+              opacity: glowOp,
+              background: "linear-gradient(to right, transparent, rgba(255,230,150,0.9), transparent)",
+              filter: "blur(4px)",
+              pointerEvents: "none",
             }}
           />
         </motion.div>
 
-        {/* ── Scroll hint ── */}
+        {/* ── Scroll hint — raised higher (bottom: 80px) ── */}
         <motion.div
           aria-hidden="true"
           style={{
             position: "absolute",
-            bottom: 38,
+            bottom: 80,
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 20,
@@ -670,20 +786,19 @@ function HeroSection() {
             pointerEvents: "none",
           }}
         >
-          <p
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 9,
-              letterSpacing: "0.30em",
-              textTransform: "uppercase",
-              color: "rgba(250,246,239,0.55)",
-            }}
-          >
+          <p style={{
+            fontFamily: FONT_BODY,
+            fontSize: 9,
+            letterSpacing: "0.30em",
+            textTransform: "uppercase",
+            color: "rgba(250,246,239,0.65)",
+            textShadow: "0 1px 8px rgba(0,0,0,0.6)",
+          }}>
             Scroll to enter
           </p>
           <ChevronDown
             size={15}
-            color="rgba(250,246,239,0.45)"
+            color="rgba(250,246,239,0.55)"
             style={{ animation: "float 1.9s ease infinite" }}
           />
         </motion.div>
