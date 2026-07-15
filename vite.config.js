@@ -1,3 +1,6 @@
+// vite.config.js
+// Vite automatically loads .env / .env.local files and exposes
+// variables prefixed with VITE_ to the client via import.meta.env.
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 

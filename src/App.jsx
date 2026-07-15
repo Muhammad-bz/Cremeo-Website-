@@ -6,6 +6,10 @@ import React, {
   useMemo,
   memo,
 } from "react";
+import { Routes, Route } from "react-router-dom";
+import AdminLogin     from "./components/admin/AdminLogin.jsx";
+import AdminDashboard from "./components/admin/AdminDashboard.jsx";
+import ProtectedRoute from "./components/admin/ProtectedRoute.jsx";
 import {
   motion,
   useScroll,
@@ -2065,9 +2069,9 @@ function CartDrawer({ open, onClose, cart, updateQty, removeItem }) {
 }
 
 /* ═══════════════════════════════════════════════
-   APP ROOT
+   PUBLIC SITE (customer-facing, no auth required)
 ═══════════════════════════════════════════════ */
-export default function App() {
+function PublicSite() {
   const [cartOpen,     setCartOpen]     = useState(false);
   const [cartBouncing, setCartBouncing] = useState(false);
   const [cart,         setCart]         = useState([]);
@@ -2105,8 +2109,8 @@ export default function App() {
 
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
 
-  const openCart  = useCallback(() => setCartOpen(true),  []);
-  const closeCart = useCallback(() => setCartOpen(false), []);
+  const openCart     = useCallback(() => setCartOpen(true),  []);
+  const closeCart    = useCallback(() => setCartOpen(false), []);
   const onDoorsReady = useCallback(() => setDoorsReady(true), []);
 
   return (
@@ -2141,5 +2145,36 @@ export default function App() {
         removeItem={removeItem}
       />
     </>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   APP ROOT — routing entry point
+═══════════════════════════════════════════════ */
+export default function App() {
+  return (
+    <Routes>
+      {/* Admin routes — login is public, dashboard is protected */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Everything else — public customer-facing website */}
+      <Route path="*" element={<PublicSite />} />
+    </Routes>
   );
 }
