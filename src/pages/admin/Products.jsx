@@ -143,10 +143,11 @@ function useProducts() {
         setError(null);
       },
       (err) => {
-        console.error("Firestore error:", err);
-        setError("Failed to load products. Please refresh.");
-        setLoading(false);
-      }
+  console.error("Firestore error:", err);
+  alert(err.message);
+  setError(err.message);
+  setLoading(false);
+}
     );
 
     return unsub;
