@@ -65,15 +65,19 @@ const PAGE_TITLES = {
 function AdminGlobalStyles() {
   return (
     <style>{`
-      /* Sidebar slide-in/out (mobile) */
+      /* Sidebar — hidden off-screen by default (mobile-first) */
       .cremeo-sidebar {
         transform: translateX(-100%);
         transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
                     width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform, width;
       }
-      .cremeo-sidebar.open   { transform: translateX(0); }
-      .cremeo-sidebar.desktop { transform: translateX(0) !important; }
+      /* Mobile: slide in when .open is present */
+      .cremeo-sidebar.open { transform: translateX(0); }
+      /* Desktop only: always visible, ignore open/closed state */
+      @media (min-width: 769px) {
+        .cremeo-sidebar { transform: translateX(0) !important; }
+      }
 
       /* Desktop collapse: width transition */
       .cremeo-sidebar.collapsed  { width: ${SIDEBAR_W_MINI}px !important; }
@@ -313,10 +317,10 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }) {
     navigate("/admin/login", { replace: true });
   }, [logout, navigate]);
 
-  // Build className string
+  // Build className string — "open" controls mobile slide-in,
+  // desktop visibility is handled entirely by the CSS media query.
   const sidebarClass = [
     "cremeo-sidebar",
-    "desktop",
     collapsed ? "collapsed" : "expanded",
     mobileOpen ? "open" : "",
   ].filter(Boolean).join(" ");
