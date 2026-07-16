@@ -7,6 +7,8 @@ import React, {
   useMemo,
   memo,
 } from "react";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../firebase/config";
 import {
   motion,
   useScroll,
@@ -393,6 +395,62 @@ const REVIEWS = [
 ];
 
 const fmt = (n) => `Rs. ${n.toLocaleString()}`;
+
+/* ═══════════════════════════════════════════════
+   FIRESTORE PRODUCTS HOOK
+   - Fetches only available === true products
+   - Sorts: featured first, then original order preserved
+═══════════════════════════════════════════════ */
+function useProducts() {
+  const [products, setProducts] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchProducts() {
+      try {
+        setLoading(true);
+        setError(null);
+        const q = query(
+          collection(db, "products"),
+          where("available", "==", true)
+        );
+        const snapshot = await getDocs(q);
+        if (cancelled) return;
+
+        const raw = snapshot.docs.map((doc) => ({
+          id:       doc.id,
+          name:     doc.data().name     ?? "",
+          price:    doc.data().price    ?? 0,
+          category: doc.data().category ?? "",
+          img:      doc.data().img      ?? doc.data().imageUrl ?? fallbackImg(doc.data().category),
+          desc:     doc.data().desc     ?? doc.data().description ?? "",
+          tag:      doc.data().tag      ?? "",
+          featured: doc.data().featured ?? false,
+          available:doc.data().available,
+          // preserve any original ordering field if present
+          order:    doc.data().order    ?? 0,
+        }));
+
+        // featured first, then rest in their original relative order
+        const featured    = raw.filter((p) => p.featured);
+        const nonFeatured = raw.filter((p) => !p.featured);
+        setProducts([...featured, ...nonFeatured]);
+      } catch (err) {
+        if (!cancelled) setError(err.message ?? "Failed to load products.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchProducts();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { products, loading, error };
+}
 
 /* ═══════════════════════════════════════════════
    RESPONSIVE DOOR IMAGES HOOK
@@ -1335,7 +1393,9 @@ const ProductCard = memo(function ProductCard({ product, onAdd, wishlist, toggle
 /* ═══════════════════════════════════════════════
    FEATURED SECTION
 ═══════════════════════════════════════════════ */
-const FeaturedSection = memo(function FeaturedSection({ onAdd, wishlist, toggleWish }) {
+function FeaturedSection({ onAdd, wishlist, toggleWish, products, loading, error }) {
+  const featured = useMemo(() => products.filter((p) => p.featured), [products]);
+
   return (
     <section id="featured" className="section-pad" style={{ background: C.cream }}>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -1344,15 +1404,49 @@ const FeaturedSection = memo(function FeaturedSection({ onAdd, wishlist, toggleW
           title={<>Today&rsquo;s <em style={{ fontStyle: "italic" }}>Favorites</em></>}
           sub="Our most-loved creations, baked this morning and ready to delight."
         />
-        <div className="product-grid-featured">
-          {FEATURED.map((p) => (
-            <ProductCard key={p.id} product={p} onAdd={onAdd} wishlist={wishlist} toggleWish={toggleWish} />
-          ))}
-        </div>
+
+        {loading && (
+          <div className="product-grid-featured">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className="img-placeholder"
+                style={{ borderRadius: 4, height: 340 }}
+              />
+            ))}
+          </div>
+        )}
+
+        {!loading && error && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <p style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 300, color: C.mist }}>
+              Unable to load featured items.
+            </p>
+            <p style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.mist, marginTop: 8 }}>
+              {error}
+            </p>
+          </div>
+        )}
+
+        {!loading && !error && featured.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <p style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 300, color: C.mist }}>
+              No featured items right now.
+            </p>
+          </div>
+        )}
+
+        {!loading && !error && featured.length > 0 && (
+          <div className="product-grid-featured">
+            {featured.map((p) => (
+              <ProductCard key={p.id} product={p} onAdd={onAdd} wishlist={wishlist} toggleWish={toggleWish} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
-});
+}
 
 /* ═══════════════════════════════════════════════
    MENU SECTION
@@ -1360,17 +1454,20 @@ const FeaturedSection = memo(function FeaturedSection({ onAdd, wishlist, toggleW
          when filter/sort state actually changes.
          Category pills use stable callbacks.
 ═══════════════════════════════════════════════ */
-function MenuSection({ onAdd, wishlist, toggleWish }) {
+function MenuSection({ onAdd, wishlist, toggleWish, products, loading, error }) {
   const [activeCategory, setActiveCategory] = useState("All");
   const [query,          setQuery]          = useState("");
   const [sort,           setSort]           = useState("default");
   const scrollRef = useRef(null);
 
-  const categories = useMemo(() => ["All", ...ALL_CATEGORIES], []);
+  const categories = useMemo(
+    () => ["All", ...new Set(products.map((p) => p.category).filter(Boolean))],
+    [products]
+  );
 
   const visible = useMemo(() => {
     const lower = query.toLowerCase();
-    return MENU_DATA
+    return products
       .filter((p) => {
         const matchCat    = activeCategory === "All" || p.category === activeCategory;
         const matchSearch = !query || p.name.toLowerCase().includes(lower) ||
@@ -1383,7 +1480,7 @@ function MenuSection({ onAdd, wishlist, toggleWish }) {
         if (sort === "alpha")      return a.name.localeCompare(b.name);
         return 0;
       });
-  }, [activeCategory, query, sort]);
+  }, [products, activeCategory, query, sort]);
 
   const handleCat = useCallback((cat) => {
     setActiveCategory(cat);
@@ -1504,7 +1601,38 @@ function MenuSection({ onAdd, wishlist, toggleWish }) {
         </div>
 
         {/* Product grid */}
-        {visible.length === 0 ? (
+        {loading && (
+          <div className="product-grid">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="img-placeholder"
+                style={{ borderRadius: 4, height: 280 }}
+              />
+            ))}
+          </div>
+        )}
+
+        {!loading && error && (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <p style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 300, color: C.mist }}>
+              Unable to load menu.
+            </p>
+            <p style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.mist, marginTop: 8 }}>
+              {error}
+            </p>
+          </div>
+        )}
+
+        {!loading && !error && products.length === 0 && (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <p style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 300, color: C.mist }}>
+              No products available right now.
+            </p>
+          </div>
+        )}
+
+        {!loading && !error && products.length > 0 && visible.length === 0 && (
           <div style={{ textAlign: "center", padding: "48px 0", color: C.mist }}>
             <p style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 300 }}>
               No results for &ldquo;{query}&rdquo;
@@ -1516,7 +1644,9 @@ function MenuSection({ onAdd, wishlist, toggleWish }) {
               Clear search
             </button>
           </div>
-        ) : (
+        )}
+
+        {!loading && !error && visible.length > 0 && (
           <div className="product-grid">
             {visible.map((p) => (
               <ProductCard key={p.id} product={p} onAdd={onAdd} wishlist={wishlist} toggleWish={toggleWish} />
@@ -2075,6 +2205,8 @@ export default function PublicSite() {
   const [wishlist,     setWishlist]     = useState(new Set());
   const [doorsReady,   setDoorsReady]   = useState(false);
 
+  const { products, loading, error } = useProducts();
+
   useReveal();
 
   const addToCart = useCallback((item) => {
@@ -2125,8 +2257,8 @@ export default function PublicSite() {
       <main>
         <HeroSection onDoorsReady={onDoorsReady} />
         <TrustStrip />
-        <FeaturedSection onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} />
-        <MenuSection     onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} />
+        <FeaturedSection onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} products={products} loading={loading} error={error} />
+        <MenuSection     onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} products={products} loading={loading} error={error} />
         <AboutSection />
         <ReviewsSection />
         <ContactSection />
