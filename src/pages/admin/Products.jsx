@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   Check,
   Package,
+  Upload,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────
@@ -62,6 +63,12 @@ const C = {
 };
 const FONT_DISPLAY = "'Cormorant Garamond', Georgia, serif";
 const FONT_BODY    = "'DM Sans', system-ui, sans-serif";
+
+/* ─────────────────────────────────────────────────
+   CLOUDINARY CONFIG  ← replace these before going live
+───────────────────────────────────────────────── */
+const CLOUDINARY_CLOUD_NAME = "leu4dssl";
+const CLOUDINARY_UPLOAD_PRESET = "cremeo";
 
 /* ─────────────────────────────────────────────────
    CATEGORIES  (matches the public site's menu data)
@@ -567,6 +574,41 @@ function ProductsStyles() {
         gap: 8px; margin-top: 8px; color: ${C.parchment};
       }
 
+      /* Image upload area */
+      .crm-upload-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 9px 16px;
+        font-family: ${FONT_BODY}; font-size: 12px; font-weight: 600;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: ${C.chocolate};
+        background: ${C.creamDeep};
+        border: 1px dashed ${C.lineStrong};
+        border-radius: 6px; cursor: pointer;
+        transition: background 0.18s, border-color 0.18s;
+        width: 100%; justify-content: center; box-sizing: border-box;
+      }
+      .crm-upload-btn:hover:not(:disabled) {
+        background: ${C.parchment}; border-color: ${C.gold};
+      }
+      .crm-upload-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+      .crm-upload-progress-wrap {
+        width: 100%; height: 4px;
+        background: ${C.parchment}; border-radius: 2px;
+        margin-top: 8px; overflow: hidden;
+      }
+      .crm-upload-progress-bar {
+        height: 100%; background: ${C.gold};
+        border-radius: 2px;
+        transition: width 0.2s ease;
+      }
+      .crm-upload-status {
+        font-family: ${FONT_BODY}; font-size: 11px;
+        color: ${C.mist}; margin-top: 5px;
+        min-height: 16px;
+      }
+      .crm-upload-status.error { color: ${C.red}; }
+      .crm-upload-status.success { color: ${C.green}; }
+
       /* Delete dialog */
       .crm-dialog {
         background: ${C.cream};
@@ -667,13 +709,62 @@ function validate(form) {
 }
 
 /* ─────────────────────────────────────────────────
+   CLOUDINARY UPLOAD HELPER
+   Uploads a File via the unsigned upload API and
+   reports progress via onProgress(0–100).
+   Returns the secure_url string on success.
+───────────────────────────────────────────────── */
+async function uploadToCloudinary(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open(
+      "POST",
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
+    );
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data.secure_url);
+        } catch {
+          reject(new Error("Invalid response from Cloudinary."));
+        }
+      } else {
+        reject(new Error(`Upload failed (HTTP ${xhr.status}).`));
+      }
+    });
+
+    xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
+    xhr.addEventListener("abort", () => reject(new Error("Upload cancelled.")));
+
+    xhr.send(formData);
+  });
+}
+
+/* ─────────────────────────────────────────────────
    PRODUCT MODAL  (Add / Edit)
 ───────────────────────────────────────────────── */
 function ProductModal({ mode, initial, onSave, onClose }) {
-  const [form,   setForm]   = useState(initial ?? EMPTY_FORM);
-  const [errors, setErrors] = useState({});
-  const [saving, setSaving] = useState(false);
-  const firstRef            = useRef(null);
+  const [form,           setForm]           = useState(initial ?? EMPTY_FORM);
+  const [errors,         setErrors]         = useState({});
+  const [saving,         setSaving]         = useState(false);
+  const [uploading,      setUploading]      = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus,   setUploadStatus]   = useState(""); // "" | "success" | "error"
+  const [uploadMsg,      setUploadMsg]      = useState("");
+  const firstRef   = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
@@ -686,6 +777,40 @@ function ProductModal({ mode, initial, onSave, onClose }) {
 
   const set = (field) => (e) =>
     setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = ""; // reset so same file can be re-selected
+    if (!file) return;
+
+    // Basic client-side guard
+    if (!file.type.startsWith("image/")) {
+      setUploadStatus("error");
+      setUploadMsg("Please select an image file.");
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadStatus("");
+    setUploadMsg("Uploading…");
+
+    try {
+      const url = await uploadToCloudinary(file, (pct) => {
+        setUploadProgress(pct);
+      });
+      setForm((f) => ({ ...f, imageUrl: url }));
+      setUploadStatus("success");
+      setUploadMsg("Image uploaded successfully.");
+    } catch (err) {
+      console.error("Cloudinary upload error:", err);
+      setUploadStatus("error");
+      setUploadMsg(err.message ?? "Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     const errs = validate(form);
@@ -783,15 +908,48 @@ function ProductModal({ mode, initial, onSave, onClose }) {
             />
           </div>
 
-          {/* Image URL */}
+          {/* Image Upload */}
           <div className="crm-field">
-            <label className="crm-label">Image URL</label>
+            <label className="crm-label">Product Image</label>
+
+            {/* Hidden file input */}
             <input
-              className="crm-input"
-              placeholder="https://… (Cloudinary upload coming in Phase 3)"
-              value={form.imageUrl}
-              onChange={set("imageUrl")}
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={handleFileChange}
             />
+
+            {/* Upload button */}
+            <button
+              type="button"
+              className="crm-upload-btn"
+              disabled={uploading || saving}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={14} />
+              {uploading ? `Uploading… ${uploadProgress}%` : "Choose Image"}
+            </button>
+
+            {/* Progress bar — visible only while uploading */}
+            {uploading && (
+              <div className="crm-upload-progress-wrap">
+                <div
+                  className="crm-upload-progress-bar"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            )}
+
+            {/* Status message */}
+            {uploadMsg && (
+              <p className={`crm-upload-status ${uploadStatus}`}>
+                {uploadMsg}
+              </p>
+            )}
+
+            {/* Image preview */}
             {form.imageUrl ? (
               <img
                 src={form.imageUrl}
@@ -803,7 +961,7 @@ function ProductModal({ mode, initial, onSave, onClose }) {
               <div className="crm-img-preview-placeholder">
                 <ImageOff size={22} />
                 <span style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.mist }}>
-                  No image — paste a URL above to preview
+                  No image — upload one above to preview
                 </span>
               </div>
             )}
@@ -831,10 +989,10 @@ function ProductModal({ mode, initial, onSave, onClose }) {
               {errors._global}
             </p>
           )}
-          <button className="crm-btn crm-btn-ghost" onClick={onClose} disabled={saving}>
+          <button className="crm-btn crm-btn-ghost" onClick={onClose} disabled={saving || uploading}>
             Cancel
           </button>
-          <button className="crm-btn crm-btn-primary" onClick={handleSubmit} disabled={saving}>
+          <button className="crm-btn crm-btn-primary" onClick={handleSubmit} disabled={saving || uploading}>
             {saving
               ? "Saving…"
               : isEdit ? <><Check size={13} /> Save Changes</> : <><Plus size={13} /> Add Product</>
