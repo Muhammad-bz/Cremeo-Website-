@@ -1,10 +1,8 @@
 // src/pages/admin/Products.jsx
 // Rendered inside AdminLayout via <Outlet />.
 //
-// ARCHITECTURE NOTE:
-// All data operations are isolated in the `useProducts` hook at the top.
-// In Phase 3, replace the local-state implementation inside that hook
-// with Firestore calls — the UI components below are untouched.
+// Phase 3: useProducts hook wired to Firestore "products" collection.
+// UI components are untouched.
 
 import React, {
   useState,
@@ -14,6 +12,19 @@ import React, {
   useRef,
   memo,
 } from "react";
+import {
+  getFirestore,
+  collection,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  query,
+  orderBy,
+} from "firebase/firestore";
+import app from "../../firebase/config";
 import {
   Plus,
   Search,
@@ -78,79 +89,9 @@ const CATEGORIES = [
 ];
 
 /* ─────────────────────────────────────────────────
-   SEED DATA  (realistic, removed in Phase 3)
+   FIRESTORE INSTANCE
 ───────────────────────────────────────────────── */
-let _nextId = 7;
-const nextId = () => `prod_${++_nextId}`;
-
-const SEED_PRODUCTS = [
-  {
-    id: "prod_1",
-    name: "Red Velvet",
-    category: "Cake 1.5 Pound",
-    description: "Classic red velvet with cream cheese frosting. Velvety crumb, deeply rich.",
-    price: 2160,
-    featured: true,
-    available: true,
-    imageUrl: "https://images.unsplash.com/photo-1535141192574-5d4897c12636?w=400&q=80&auto=format&fit=crop",
-    createdAt: "2026-01-12",
-  },
-  {
-    id: "prod_2",
-    name: "Dream Cake",
-    category: "Dream Cake",
-    description: "Our signature Dream Cake — light, airy and impossible to resist.",
-    price: 550,
-    featured: true,
-    available: true,
-    imageUrl: "https://images.unsplash.com/photo-1542826438-bd32f43d626f?w=400&q=80&auto=format&fit=crop",
-    createdAt: "2026-01-15",
-  },
-  {
-    id: "prod_3",
-    name: "Pistachio Three Milk",
-    category: "Bowls",
-    description: "Decadent pistachio three milk bowl — nutty, completely indulgent.",
-    price: 550,
-    featured: true,
-    available: true,
-    imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&q=80&auto=format&fit=crop",
-    createdAt: "2026-01-18",
-  },
-  {
-    id: "prod_4",
-    name: "Lotus Biscoff",
-    category: "Cake 2 Pound",
-    description: "Two-pound Lotus Biscoff cake with caramelised biscuit layers.",
-    price: 2980,
-    featured: false,
-    available: true,
-    imageUrl: "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=400&q=80&auto=format&fit=crop",
-    createdAt: "2026-02-03",
-  },
-  {
-    id: "prod_5",
-    name: "Chocolate Fudge Brownie",
-    category: "Loaded Brownie",
-    description: "Fudgy, dense, loaded with dark chocolate ganache.",
-    price: 250,
-    featured: false,
-    available: false,
-    imageUrl: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=400&q=80&auto=format&fit=crop",
-    createdAt: "2026-02-10",
-  },
-  {
-    id: "prod_6",
-    name: "Cold Coffee",
-    category: "Coffee",
-    description: "Chilled, creamy cold coffee made with freshly brewed espresso.",
-    price: 290,
-    featured: false,
-    available: true,
-    imageUrl: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=80&auto=format&fit=crop",
-    createdAt: "2026-03-01",
-  },
-];
+const db = getFirestore(app);
 
 /* ─────────────────────────────────────────────────
    EMPTY FORM  (single source of truth for the modal)
@@ -166,46 +107,78 @@ const EMPTY_FORM = {
 };
 
 /* ═══════════════════════════════════════════════
-   useProducts  — ALL DATA LOGIC IS HERE.
-   Replace this hook's internals with Firestore in Phase 3.
-   The hook's public API (products, loading, error, addProduct,
-   updateProduct, deleteProduct) must stay identical.
+   useProducts  — Firestore "products" collection.
+   Public API: products, loading, error, addProduct,
+   updateProduct, deleteProduct.
 ════════════════════════════════════════════════ */
 function useProducts() {
   const [products, setProducts] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
 
-  /* Simulate async load on mount */
+  /* Real-time listener — ordered newest first */
   useEffect(() => {
-    const t = setTimeout(() => {
-      setProducts(SEED_PRODUCTS);
-      setLoading(false);
-    }, 700);
-    return () => clearTimeout(t);
-  }, []);
-
-  const addProduct = useCallback((data) => {
-    const product = {
-      ...data,
-      id:        nextId(),
-      price:     Number(data.price),
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-    setProducts((prev) => [product, ...prev]);
-    return product;
-  }, []);
-
-  const updateProduct = useCallback((id, data) => {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, ...data, price: Number(data.price) } : p
-      )
+    const q = query(
+      collection(db, "products"),
+      orderBy("createdAt", "desc")
     );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const docs = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            ...data,
+            id: d.id,
+            price: Number(data.price),
+            // Normalise Firestore Timestamp → "YYYY-MM-DD" string for display
+            createdAt: data.createdAt?.toDate
+              ? data.createdAt.toDate().toISOString().slice(0, 10)
+              : data.createdAt ?? "",
+          };
+        });
+        setProducts(docs);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error("Firestore error:", err);
+        setError("Failed to load products. Please refresh.");
+        setLoading(false);
+      }
+    );
+
+    return unsub;
   }, []);
 
-  const deleteProduct = useCallback((id) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  const addProduct = useCallback(async (data) => {
+    await addDoc(collection(db, "products"), {
+      name:        data.name.trim(),
+      category:    data.category,
+      description: data.description.trim(),
+      price:       Number(data.price),
+      featured:    Boolean(data.featured),
+      available:   Boolean(data.available),
+      imageUrl:    data.imageUrl.trim(),
+      createdAt:   serverTimestamp(),
+    });
+  }, []);
+
+  const updateProduct = useCallback(async (id, data) => {
+    await updateDoc(doc(db, "products", id), {
+      name:        data.name.trim(),
+      category:    data.category,
+      description: data.description.trim(),
+      price:       Number(data.price),
+      featured:    Boolean(data.featured),
+      available:   Boolean(data.available),
+      imageUrl:    data.imageUrl.trim(),
+    });
+  }, []);
+
+  const deleteProduct = useCallback(async (id) => {
+    await deleteDoc(doc(db, "products", id));
   }, []);
 
   return { products, loading, error, addProduct, updateProduct, deleteProduct };
@@ -717,10 +690,14 @@ function ProductModal({ mode, initial, onSave, onClose }) {
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
-    // Simulate async (replace with await Firestore call in Phase 3)
-    await new Promise((r) => setTimeout(r, 320));
-    onSave(form);
-    onClose();
+    try {
+      await onSave(form);
+      onClose();
+    } catch (err) {
+      console.error("Save failed:", err);
+      setErrors({ _global: "Failed to save. Please try again." });
+      setSaving(false);
+    }
   };
 
   const isEdit = mode === "edit";
@@ -848,6 +825,11 @@ function ProductModal({ mode, initial, onSave, onClose }) {
 
         {/* Footer */}
         <div className="crm-modal-footer">
+          {errors._global && (
+            <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.red, flex: 1, margin: 0, alignSelf: "center" }}>
+              {errors._global}
+            </p>
+          )}
           <button className="crm-btn crm-btn-ghost" onClick={onClose} disabled={saving}>
             Cancel
           </button>
@@ -875,11 +857,19 @@ function DeleteDialog({ product, onConfirm, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const [delError, setDelError] = useState(null);
+
   const handleConfirm = async () => {
     setBusy(true);
-    await new Promise((r) => setTimeout(r, 280));
-    onConfirm(product.id);
-    onClose();
+    setDelError(null);
+    try {
+      await onConfirm(product.id);
+      onClose();
+    } catch (err) {
+      console.error("Delete failed:", err);
+      setDelError("Delete failed. Please try again.");
+      setBusy(false);
+    }
   };
 
   return (
@@ -903,6 +893,11 @@ function DeleteDialog({ product, onConfirm, onClose }) {
             </p>
           </div>
         </div>
+        {delError && (
+          <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.red, margin: "0 0 12px" }}>
+            {delError}
+          </p>
+        )}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button className="crm-btn crm-btn-ghost" onClick={onClose} disabled={busy}>
             Cancel
@@ -1173,7 +1168,7 @@ function ProductList({ products, onEdit, onDelete, loading, hasFilters, onAdd, o
 ════════════════════════════════════════════════ */
 export default function Products() {
   /* Data layer */
-  const { products, loading, addProduct, updateProduct, deleteProduct } = useProducts();
+  const { products, loading, error, addProduct, updateProduct, deleteProduct } = useProducts();
 
   /* UI state */
   const [query,    setQuery]    = useState("");
@@ -1200,14 +1195,14 @@ export default function Products() {
 
   const handleSave = useCallback((form) => {
     if (modal?.mode === "edit") {
-      updateProduct(modal.product.id, form);
+      return updateProduct(modal.product.id, form);
     } else {
-      addProduct(form);
+      return addProduct(form);
     }
   }, [modal, addProduct, updateProduct]);
 
   const handleDelete = useCallback((id) => {
-    deleteProduct(id);
+    return deleteProduct(id);
   }, [deleteProduct]);
 
   return (
@@ -1225,6 +1220,19 @@ export default function Products() {
           </h1>
           <div style={{ width: 48, height: 1.5, background: C.gold, marginTop: 10 }} />
         </div>
+
+        {/* Firestore error banner */}
+        {error && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "11px 16px", borderRadius: 8, marginBottom: 20,
+            background: C.redBg, border: `1px solid ${C.redLine}`,
+            fontFamily: FONT_BODY, fontSize: 13, color: C.red,
+          }}>
+            <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+            {error}
+          </div>
+        )}
 
         {/* Toolbar */}
         <Toolbar
