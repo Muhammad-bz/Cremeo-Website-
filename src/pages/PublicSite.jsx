@@ -7,7 +7,7 @@ import React, {
   useMemo,
   memo,
 } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, addDoc, query, where, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/config";
 import {
   motion,
@@ -210,6 +210,54 @@ function GlobalStyles() {
         animation: slideInRight 0.3s cubic-bezier(0.16,1,0.3,1);
         box-shadow: -8px 0 40px rgba(46,26,14,0.15);
         will-change: transform;
+      }
+
+      /* ── Checkout form inside cart drawer ── */
+      .checkout-field {
+        display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px;
+      }
+      .checkout-label {
+        font-family: ${FONT_BODY}; font-size: 10.5px; font-weight: 600;
+        letter-spacing: 0.07em; text-transform: uppercase; color: ${C.mist};
+      }
+      .checkout-input {
+        font-family: ${FONT_BODY}; font-size: 13.5px; color: ${C.espresso};
+        background: ${C.creamDeep}; border: 1px solid ${C.line};
+        border-radius: 5px; padding: 10px 12px; outline: none; width: 100%;
+        box-sizing: border-box;
+        transition: border-color 0.18s, box-shadow 0.18s;
+      }
+      .checkout-input:focus {
+        border-color: ${C.gold};
+        box-shadow: 0 0 0 3px rgba(201,168,76,0.13);
+      }
+      .checkout-input.error { border-color: #C0392B; }
+      .checkout-error {
+        font-family: ${FONT_BODY}; font-size: 11px; color: #C0392B;
+      }
+      .checkout-back-btn {
+        background: none; border: none; cursor: pointer;
+        font-family: ${FONT_BODY}; font-size: 12px; font-weight: 600;
+        color: ${C.mist}; letter-spacing: 0.05em; text-transform: uppercase;
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 0; margin-bottom: 18px;
+        transition: color 0.18s;
+      }
+      .checkout-back-btn:hover { color: ${C.chocolate}; }
+
+      /* ── Order success screen ── */
+      .order-success {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; text-align: center;
+        padding: 48px 28px; flex: 1;
+        animation: fadeUp 0.45s ease;
+      }
+      .order-success-icon {
+        width: 64px; height: 64px; border-radius: 50%;
+        background: rgba(34,139,70,0.10);
+        border: 1.5px solid rgba(34,139,70,0.28);
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 20px;
       }
 
       /* Reduce motion */
@@ -2049,15 +2097,256 @@ const Footer = memo(function Footer() {
 });
 
 /* ═══════════════════════════════════════════════
+   CHECKOUT FORM
+   Collects customer details and submits to Firestore.
+═══════════════════════════════════════════════ */
+const EMPTY_CHECKOUT = { customerName: "", phone: "", address: "", notes: "" };
+
+function CheckoutForm({ cart, total, onBack, onSuccess }) {
+  const [form,       setForm]       = useState(EMPTY_CHECKOUT);
+  const [errors,     setErrors]     = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitErr,  setSubmitErr]  = useState("");
+
+  const set = (field) => (e) => {
+    setForm((f) => ({ ...f, [field]: e.target.value }));
+    if (errors[field]) setErrors((er) => ({ ...er, [field]: "" }));
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!form.customerName.trim()) e.customerName = "Name is required.";
+    if (!form.phone.trim())        e.phone        = "Phone number is required.";
+    if (!form.address.trim())      e.address      = "Delivery address is required.";
+    return e;
+  };
+
+  const handleSubmit = async () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+
+    setSubmitting(true);
+    setSubmitErr("");
+
+    try {
+      const orderItems = cart.map((i) => ({
+        id:       i.id,
+        name:     i.name,
+        price:    i.price,
+        qty:      i.qty,
+        subtotal: i.price * i.qty,
+        img:      i.img ?? "",
+      }));
+
+      await addDoc(collection(db, "orders"), {
+        customerName: form.customerName.trim(),
+        phone:        form.phone.trim(),
+        address:      form.address.trim(),
+        notes:        form.notes.trim(),
+        items:        orderItems,
+        total,
+        status:       "Pending",
+        createdAt:    serverTimestamp(),
+      });
+
+      onSuccess();
+    } catch (err) {
+      console.error("Order submission error:", err);
+      setSubmitErr("Something went wrong. Please try again or call us directly.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Header */}
+      <div style={{
+        padding: "20px 24px",
+        borderBottom: `1px solid ${C.line}`,
+        flexShrink: 0,
+      }}>
+        <button className="checkout-back-btn" onClick={onBack} disabled={submitting}>
+          ← Back to Cart
+        </button>
+        <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 400, color: C.espresso }}>
+          Your Details
+        </h3>
+        <p style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.mist, marginTop: 2 }}>
+          We'll use this to deliver your order
+        </p>
+      </div>
+
+      {/* Form body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+
+        {/* Order summary strip */}
+        <div style={{
+          background: C.creamDeep, border: `1px solid ${C.line}`,
+          borderRadius: 6, padding: "12px 14px", marginBottom: 20,
+        }}>
+          <p style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.mist, marginBottom: 4 }}>
+            {cart.reduce((s, i) => s + i.qty, 0)} item{cart.reduce((s, i) => s + i.qty, 0) !== 1 ? "s" : ""}
+          </p>
+          <p style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: C.espresso }}>
+            Total: {fmt(total)}
+          </p>
+        </div>
+
+        <div className="checkout-field">
+          <label className="checkout-label">Customer Name *</label>
+          <input
+            className={`checkout-input${errors.customerName ? " error" : ""}`}
+            type="text"
+            placeholder="Full name"
+            value={form.customerName}
+            onChange={set("customerName")}
+            disabled={submitting}
+          />
+          {errors.customerName && <span className="checkout-error">{errors.customerName}</span>}
+        </div>
+
+        <div className="checkout-field">
+          <label className="checkout-label">Phone Number *</label>
+          <input
+            className={`checkout-input${errors.phone ? " error" : ""}`}
+            type="tel"
+            placeholder="e.g. 0300 1234567"
+            value={form.phone}
+            onChange={set("phone")}
+            disabled={submitting}
+          />
+          {errors.phone && <span className="checkout-error">{errors.phone}</span>}
+        </div>
+
+        <div className="checkout-field">
+          <label className="checkout-label">Delivery Address *</label>
+          <textarea
+            className={`checkout-input${errors.address ? " error" : ""}`}
+            rows={3}
+            placeholder="Street, area, city"
+            value={form.address}
+            onChange={set("address")}
+            disabled={submitting}
+            style={{ resize: "vertical", minHeight: 72 }}
+          />
+          {errors.address && <span className="checkout-error">{errors.address}</span>}
+        </div>
+
+        <div className="checkout-field">
+          <label className="checkout-label">Order Notes <span style={{ opacity: 0.6 }}>(optional)</span></label>
+          <textarea
+            className="checkout-input"
+            rows={2}
+            placeholder="Flavour preferences, allergies, special instructions…"
+            value={form.notes}
+            onChange={set("notes")}
+            disabled={submitting}
+            style={{ resize: "vertical" }}
+          />
+        </div>
+
+        {submitErr && (
+          <p style={{
+            fontFamily: FONT_BODY, fontSize: 12, color: "#C0392B",
+            background: "rgba(192,57,43,0.07)", border: "1px solid rgba(192,57,43,0.2)",
+            borderRadius: 5, padding: "10px 12px", marginTop: 4,
+          }}>
+            {submitErr}
+          </p>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.line}`, flexShrink: 0 }}>
+        <button
+          className="btn-primary"
+          style={{ width: "100%", marginBottom: 10, opacity: submitting ? 0.7 : 1 }}
+          onClick={handleSubmit}
+          disabled={submitting}
+        >
+          {submitting ? "Placing Order…" : <><Check size={14} /> Place Order</>}
+        </button>
+        <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.mist, textAlign: "center" }}>
+          Or call / WhatsApp: <strong>0313 5932718</strong>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   ORDER SUCCESS SCREEN
+═══════════════════════════════════════════════ */
+function OrderSuccess({ onClose }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{
+        padding: "20px 24px",
+        borderBottom: `1px solid ${C.line}`,
+        display: "flex", justifyContent: "flex-end",
+        flexShrink: 0,
+      }}>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            background: C.parchment, border: "none", borderRadius: "50%",
+            width: 34, height: 34,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer",
+          }}
+        >
+          <X size={15} color={C.espresso} />
+        </button>
+      </div>
+
+      <div className="order-success">
+        <div className="order-success-icon">
+          <Check size={28} color="#22A84A" strokeWidth={2.5} />
+        </div>
+        <h3 style={{
+          fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 400,
+          color: C.espresso, marginBottom: 10,
+        }}>
+          Order Placed!
+        </h3>
+        <p style={{
+          fontFamily: FONT_BODY, fontSize: 14, color: C.mist,
+          lineHeight: 1.65, maxWidth: 280, marginBottom: 28,
+        }}>
+          Thank you! We've received your order and will be in touch shortly to confirm delivery.
+        </p>
+        <p style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.mist, marginBottom: 28 }}>
+          Questions? Call / WhatsApp: <strong style={{ color: C.espresso }}>0313 5932718</strong>
+        </p>
+        <button className="btn-primary" onClick={onClose}>
+          Continue Shopping
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
    CART DRAWER
+   Steps: "cart" → "checkout" → "success"
    PERF: Conditionally rendered only when open.
          slideInRight uses translate3d (GPU-composited).
 ═══════════════════════════════════════════════ */
-function CartDrawer({ open, onClose, cart, updateQty, removeItem }) {
+function CartDrawer({ open, onClose, cart, updateQty, removeItem, onOrderSuccess }) {
+  // "cart" | "checkout" | "success"
+  const [step, setStep] = useState("cart");
+
   const total = useMemo(
     () => cart.reduce((s, i) => s + i.price * i.qty, 0),
     [cart]
   );
+
+  // Reset to cart step when drawer closes
+  useEffect(() => {
+    if (!open) setStep("cart");
+  }, [open]);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -2066,11 +2355,16 @@ function CartDrawer({ open, onClose, cart, updateQty, removeItem }) {
 
   if (!open) return null;
 
+  const handleSuccess = () => {
+    setStep("success");
+    onOrderSuccess?.();   // clears the cart in parent
+  };
+
   return (
     <>
       <div
         role="presentation"
-        onClick={onClose}
+        onClick={step === "success" ? onClose : onClose}
         style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
           background: "rgba(46,26,14,0.5)",
@@ -2079,116 +2373,141 @@ function CartDrawer({ open, onClose, cart, updateQty, removeItem }) {
         }}
       />
       <div className="cart-drawer" role="dialog" aria-label="Shopping cart" aria-modal="true">
-        <div style={{
-          padding: "20px 24px",
-          borderBottom: `1px solid ${C.line}`,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          flexShrink: 0,
-        }}>
-          <div>
-            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 400, color: C.espresso }}>
-              Your Order
-            </h3>
-            <p style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.mist, marginTop: 2 }}>
-              {cart.length} item{cart.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close cart"
-            style={{
-              background: C.parchment, border: "none", borderRadius: "50%",
-              width: 34, height: 34,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", flexShrink: 0,
-            }}
-          >
-            <X size={15} color={C.espresso} />
-          </button>
-        </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
-          {cart.length === 0 ? (
-            <div style={{ textAlign: "center", paddingTop: 60 }}>
-              <ShoppingBag size={36} color={C.parchment} style={{ margin: "0 auto 16px", display: "block" }} />
-              <p style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: C.mist, fontWeight: 300 }}>
-                Your basket is empty
-              </p>
-              <p style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.parchment, marginTop: 6 }}>
-                Add something delicious!
-              </p>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div
-                key={item.id}
-                style={{ display: "flex", gap: 12, marginBottom: 18, paddingBottom: 18, borderBottom: `1px solid ${C.line}` }}
-              >
-                <img
-                  src={item.img}
-                  alt={item.name}
-                  loading="lazy"
-                  decoding="async"
-                  style={{ width: 62, height: 62, objectFit: "cover", borderRadius: 3, flexShrink: 0 }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{
-                    fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 400,
-                    color: C.espresso, marginBottom: 2,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
-                    {item.name}
-                  </p>
-                  <p style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.gold, fontWeight: 500 }}>
-                    {fmt(item.price)}
-                  </p>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                    <button
-                      aria-label="Decrease quantity"
-                      onClick={() => { if (item.qty <= 1) removeItem(item.id); else updateQty(item.id, -1); }}
-                      style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${C.line}`, background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >
-                      <Minus size={11} color={C.mist} />
-                    </button>
-                    <span style={{ fontFamily: FONT_BODY, fontWeight: 600, fontSize: 13, minWidth: 18, textAlign: "center" }}>
-                      {item.qty}
-                    </span>
-                    <button
-                      aria-label="Increase quantity"
-                      onClick={() => updateQty(item.id, 1)}
-                      style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${C.line}`, background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >
-                      <Plus size={11} color={C.mist} />
-                    </button>
-                    <button
-                      aria-label="Remove item"
-                      onClick={() => removeItem(item.id)}
-                      style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: C.mist, opacity: 0.45 }}
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                </div>
+        {/* ── Step: success ── */}
+        {step === "success" && (
+          <OrderSuccess onClose={onClose} />
+        )}
+
+        {/* ── Step: checkout form ── */}
+        {step === "checkout" && (
+          <CheckoutForm
+            cart={cart}
+            total={total}
+            onBack={() => setStep("cart")}
+            onSuccess={handleSuccess}
+          />
+        )}
+
+        {/* ── Step: cart ── */}
+        {step === "cart" && (
+          <>
+            <div style={{
+              padding: "20px 24px",
+              borderBottom: `1px solid ${C.line}`,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              flexShrink: 0,
+            }}>
+              <div>
+                <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 400, color: C.espresso }}>
+                  Your Order
+                </h3>
+                <p style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.mist, marginTop: 2 }}>
+                  {cart.length} item{cart.length !== 1 ? "s" : ""}
+                </p>
               </div>
-            ))
-          )}
-        </div>
-
-        {cart.length > 0 && (
-          <div style={{ padding: "20px 24px", borderTop: `1px solid ${C.line}`, flexShrink: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.mist }}>Subtotal</span>
-              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: C.espresso }}>
-                {fmt(total)}
-              </span>
+              <button
+                onClick={onClose}
+                aria-label="Close cart"
+                style={{
+                  background: C.parchment, border: "none", borderRadius: "50%",
+                  width: 34, height: 34,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", flexShrink: 0,
+                }}
+              >
+                <X size={15} color={C.espresso} />
+              </button>
             </div>
-            <button className="btn-primary" style={{ width: "100%", marginBottom: 10 }}>
-              Place Order (Call to Confirm)
-            </button>
-            <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.mist, textAlign: "center" }}>
-              Or call / WhatsApp: <strong>0313 5932718</strong>
-            </p>
-          </div>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+              {cart.length === 0 ? (
+                <div style={{ textAlign: "center", paddingTop: 60 }}>
+                  <ShoppingBag size={36} color={C.parchment} style={{ margin: "0 auto 16px", display: "block" }} />
+                  <p style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: C.mist, fontWeight: 300 }}>
+                    Your basket is empty
+                  </p>
+                  <p style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.parchment, marginTop: 6 }}>
+                    Add something delicious!
+                  </p>
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{ display: "flex", gap: 12, marginBottom: 18, paddingBottom: 18, borderBottom: `1px solid ${C.line}` }}
+                  >
+                    <img
+                      src={item.img}
+                      alt={item.name}
+                      loading="lazy"
+                      decoding="async"
+                      style={{ width: 62, height: 62, objectFit: "cover", borderRadius: 3, flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 400,
+                        color: C.espresso, marginBottom: 2,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {item.name}
+                      </p>
+                      <p style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.gold, fontWeight: 500 }}>
+                        {fmt(item.price)}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                        <button
+                          aria-label="Decrease quantity"
+                          onClick={() => { if (item.qty <= 1) removeItem(item.id); else updateQty(item.id, -1); }}
+                          style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${C.line}`, background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >
+                          <Minus size={11} color={C.mist} />
+                        </button>
+                        <span style={{ fontFamily: FONT_BODY, fontWeight: 600, fontSize: 13, minWidth: 18, textAlign: "center" }}>
+                          {item.qty}
+                        </span>
+                        <button
+                          aria-label="Increase quantity"
+                          onClick={() => updateQty(item.id, 1)}
+                          style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${C.line}`, background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >
+                          <Plus size={11} color={C.mist} />
+                        </button>
+                        <button
+                          aria-label="Remove item"
+                          onClick={() => removeItem(item.id)}
+                          style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: C.mist, opacity: 0.45 }}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {cart.length > 0 && (
+              <div style={{ padding: "20px 24px", borderTop: `1px solid ${C.line}`, flexShrink: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <span style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.mist }}>Subtotal</span>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: C.espresso }}>
+                    {fmt(total)}
+                  </span>
+                </div>
+                <button
+                  className="btn-primary"
+                  style={{ width: "100%", marginBottom: 10 }}
+                  onClick={() => setStep("checkout")}
+                >
+                  Proceed to Checkout
+                </button>
+                <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.mist, textAlign: "center" }}>
+                  Or call / WhatsApp: <strong>0313 5932718</strong>
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </>
@@ -2241,6 +2560,7 @@ export default function PublicSite() {
   const openCart     = useCallback(() => setCartOpen(true),  []);
   const closeCart    = useCallback(() => setCartOpen(false), []);
   const onDoorsReady = useCallback(() => setDoorsReady(true), []);
+  const clearCart    = useCallback(() => setCart([]), []);
 
   return (
     <>
@@ -2272,6 +2592,7 @@ export default function PublicSite() {
         cart={cart}
         updateQty={updateQty}
         removeItem={removeItem}
+        onOrderSuccess={clearCart}
       />
     </>
   );

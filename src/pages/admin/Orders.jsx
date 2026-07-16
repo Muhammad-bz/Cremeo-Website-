@@ -1,6 +1,15 @@
 // src/pages/admin/Orders.jsx
-// Phase 2 placeholder — no Firestore, no Cloudinary, local dummy data only.
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  doc,
+  updateDoc,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../../firebase/config";
 import {
   ShoppingCart,
   Clock,
@@ -11,6 +20,7 @@ import {
   X,
   PackageOpen,
   Eye,
+  RefreshCw,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────
@@ -68,137 +78,72 @@ const STATUS = {
 const ALL_STATUSES = ["all", "pending", "processing", "completed", "cancelled"];
 
 /* ─────────────────────────────────────────────────
-   DUMMY DATA  (12 realistic coffee-shop orders)
+   FIRESTORE ORDERS HOOK
+   Real-time listener — updates whenever an order is
+   added or changed in the "orders" collection.
 ───────────────────────────────────────────────── */
-const DUMMY_ORDERS = [
-  {
-    id: "ORD-0041",
-    customer: "Amelia Thornton",
-    email: "a.thornton@mail.com",
-    items: ["Cremeo Blend 250g", "Ethiopian Single Origin 200g"],
-    total: 42.50,
-    status: "completed",
-    date: "2024-07-15",
-    payment: "Card",
-  },
-  {
-    id: "ORD-0040",
-    customer: "James Okafor",
-    email: "james.o@inbox.io",
-    items: ["Cold Brew Concentrate 500ml"],
-    total: 18.00,
-    status: "pending",
-    date: "2024-07-15",
-    payment: "PayPal",
-  },
-  {
-    id: "ORD-0039",
-    customer: "Lena Kovač",
-    email: "lena.k@eumail.eu",
-    items: ["Guatemala Antigua 250g", "Cremeo Mug", "Grinder Calibration Kit"],
-    total: 87.00,
-    status: "processing",
-    date: "2024-07-14",
-    payment: "Card",
-  },
-  {
-    id: "ORD-0038",
-    customer: "Marcus Webb",
-    email: "m.webb@studio.co",
-    items: ["Kenya AA 200g"],
-    total: 22.00,
-    status: "completed",
-    date: "2024-07-14",
-    payment: "Card",
-  },
-  {
-    id: "ORD-0037",
-    customer: "Priya Nair",
-    email: "priya.nair@gmail.com",
-    items: ["Decaf Colombia 250g", "Pour-Over Set"],
-    total: 56.50,
-    status: "completed",
-    date: "2024-07-13",
-    payment: "Card",
-  },
-  {
-    id: "ORD-0036",
-    customer: "Tobias Müller",
-    email: "tmuller@webde.de",
-    items: ["Cremeo Blend 500g", "Ethiopian Single Origin 200g", "Aeropress"],
-    total: 74.00,
-    status: "cancelled",
-    date: "2024-07-13",
-    payment: "PayPal",
-  },
-  {
-    id: "ORD-0035",
-    customer: "Chloe Beaumont",
-    email: "chloe.b@frenchpress.fr",
-    items: ["Rwanda Natural 200g"],
-    total: 19.50,
-    status: "processing",
-    date: "2024-07-12",
-    payment: "Card",
-  },
-  {
-    id: "ORD-0034",
-    customer: "Daniel Crane",
-    email: "d.crane@outlook.com",
-    items: ["Cold Brew Concentrate 500ml", "Cremeo Blend 250g"],
-    total: 38.00,
-    status: "pending",
-    date: "2024-07-12",
-    payment: "Card",
-  },
-  {
-    id: "ORD-0033",
-    customer: "Yuki Tanaka",
-    email: "yuki.tanaka@jpmail.jp",
-    items: ["Cremeo Mug", "Cremeo Blend 250g"],
-    total: 46.00,
-    status: "completed",
-    date: "2024-07-11",
-    payment: "PayPal",
-  },
-  {
-    id: "ORD-0032",
-    customer: "Sophie Adler",
-    email: "s.adler@domain.ch",
-    items: ["Guatemala Antigua 500g"],
-    total: 32.00,
-    status: "completed",
-    date: "2024-07-11",
-    payment: "Card",
-  },
-  {
-    id: "ORD-0031",
-    customer: "Kwame Asante",
-    email: "kwame.a@afmail.gh",
-    items: ["Kenya AA 200g", "Pour-Over Set", "Rwanda Natural 200g"],
-    total: 63.50,
-    status: "cancelled",
-    date: "2024-07-10",
-    payment: "Card",
-  },
-  {
-    id: "ORD-0030",
-    customer: "Isabel Ferreira",
-    email: "isabel.f@posta.pt",
-    items: ["Espresso Roast 250g"],
-    total: 16.00,
-    status: "pending",
-    date: "2024-07-10",
-    payment: "PayPal",
-  },
-];
+function useOrders() {
+  const [orders,  setOrders]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const rows = snap.docs.map((d) => {
+          const data      = d.data();
+          const ts        = data.createdAt;
+          // Firestore Timestamp → ISO date string (or fallback)
+          const dateStr   = ts instanceof Timestamp
+            ? ts.toDate().toISOString().slice(0, 10)
+            : (ts?.seconds ? new Date(ts.seconds * 1000).toISOString().slice(0, 10) : "—");
+
+          // Normalise items: support both flat name arrays and object arrays
+          const rawItems  = Array.isArray(data.items) ? data.items : [];
+          const itemNames = rawItems.map((i) =>
+            typeof i === "string" ? i : `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ""}`
+          );
+
+          return {
+            id:       d.id,
+            customer: data.customerName ?? data.customer ?? "—",
+            phone:    data.phone        ?? "",
+            address:  data.address      ?? "",
+            notes:    data.notes        ?? "",
+            items:    itemNames,
+            rawItems,
+            total:    data.total        ?? 0,
+            status:   (data.status ?? "Pending").toLowerCase(),
+            date:     dateStr,
+          };
+        });
+        setOrders(rows);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error("Orders listener error:", err);
+        setError(err.message ?? "Failed to load orders.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, []);
+
+  return { orders, loading, error };
+}
 
 /* ─────────────────────────────────────────────────
    DERIVED STATS
 ───────────────────────────────────────────────── */
-const TODAY = "2024-07-15";
 function deriveStats(orders) {
-  const todayOrders  = orders.filter((o) => o.date === TODAY);
+  const today = new Date().toISOString().slice(0, 10);
+  const todayOrders = orders.filter((o) => o.date === today);
   return {
     todayCount: todayOrders.length,
     pending:    orders.filter((o) => o.status === "pending").length,
@@ -582,21 +527,23 @@ export default function Orders() {
   const [search, setSearch]       = useState("");
   const [statusFilter, setStatus] = useState("all");
 
-  const stats = useMemo(() => deriveStats(DUMMY_ORDERS), []);
+  const { orders, loading, error } = useOrders();
+
+  const stats = useMemo(() => deriveStats(orders), [orders]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return DUMMY_ORDERS.filter((o) => {
+    return orders.filter((o) => {
       const matchStatus = statusFilter === "all" || o.status === statusFilter;
       const matchSearch =
         !q ||
-        o.id.toLowerCase().includes(q)         ||
-        o.customer.toLowerCase().includes(q)   ||
-        o.email.toLowerCase().includes(q)      ||
+        o.id.toLowerCase().includes(q)       ||
+        o.customer.toLowerCase().includes(q) ||
+        o.phone.toLowerCase().includes(q)    ||
         o.items.some((i) => i.toLowerCase().includes(q));
       return matchStatus && matchSearch;
     });
-  }, [search, statusFilter]);
+  }, [orders, search, statusFilter]);
 
   const hasFilters = search.trim() !== "" || statusFilter !== "all";
 
@@ -658,10 +605,33 @@ export default function Orders() {
             iconColor={C.chocolate}
             iconBg={`rgba(92,51,23,0.08)`}
             label="Revenue Today"
-            value={`PKR ${stats.revenue.toFixed(2)}`}
+            value={`Rs. ${stats.revenue.toLocaleString()}`}
             delay={0.15}
           />
         </div>
+
+        {/* ── Loading / error ─────────────────────── */}
+        {loading && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "18px 0", color: C.mist,
+            fontFamily: FONT_BODY, fontSize: 13,
+          }}>
+            <RefreshCw size={14} style={{ animation: "ord-spin 1s linear infinite" }} />
+            Loading orders…
+            <style>{`@keyframes ord-spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div style={{
+            background: "rgba(192,57,43,0.07)", border: "1px solid rgba(192,57,43,0.22)",
+            borderRadius: 8, padding: "14px 18px", marginBottom: 20,
+            fontFamily: FONT_BODY, fontSize: 13, color: "#8B2020",
+          }}>
+            ⚠ {error}
+          </div>
+        )}
 
         {/* ── Toolbar ─────────────────────────────── */}
         <div
@@ -765,7 +735,7 @@ export default function Orders() {
                           {order.customer}
                         </p>
                         <p style={{ fontSize: 11.5, color: C.mist, opacity: 0.8 }}>
-                          {order.email}
+                          {order.phone}
                         </p>
                       </td>
 
@@ -784,7 +754,7 @@ export default function Orders() {
 
                       {/* Total */}
                       <td style={{ textAlign: "right", fontWeight: 600, color: C.espresso, whiteSpace: "nowrap" }}>
-                        PKR {order.total.toFixed(2)}
+                        Rs. {Number(order.total).toLocaleString()}
                       </td>
 
                       {/* Actions */}
@@ -834,7 +804,7 @@ export default function Orders() {
                       {order.customer}
                     </p>
                     <p style={{ fontSize: 12, color: C.mist, marginBottom: 10 }}>
-                      {order.email}
+                      {order.phone}
                     </p>
 
                     {/* Items */}
@@ -846,7 +816,7 @@ export default function Orders() {
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <span style={{ fontSize: 12, color: C.mist }}>{order.date}</span>
                       <span style={{ fontWeight: 700, fontSize: 15, color: C.espresso }}>
-                        PKR {order.total.toFixed(2)}
+                        Rs. {Number(order.total).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -867,7 +837,7 @@ export default function Orders() {
             }}>
               <span style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.mist }}>
                 Showing <strong style={{ color: C.espresso }}>{filtered.length}</strong> of{" "}
-                <strong style={{ color: C.espresso }}>{DUMMY_ORDERS.length}</strong> orders
+                <strong style={{ color: C.espresso }}>{orders.length}</strong> orders
               </span>
               <span style={{
                 fontFamily: FONT_BODY,
@@ -876,7 +846,7 @@ export default function Orders() {
                 opacity: 0.6,
                 fontStyle: "italic",
               }}>
-                Placeholder data · Firestore not connected
+                Live · Firestore
               </span>
             </div>
           )}
