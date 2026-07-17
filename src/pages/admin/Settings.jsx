@@ -59,8 +59,8 @@ const DAY_ABR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const FIRESTORE_DOC = { collection: "settings", id: "site" };
 
 /* Cloudinary config — replace with your own cloud name & unsigned preset */
-const CLOUDINARY_CLOUD  = "your_cloud_name";
-const CLOUDINARY_PRESET = "your_upload_preset";
+const CLOUDINARY_CLOUD_NAME = "leu4dssl";
+const CLOUDINARY_UPLOAD_PRESET = "cremeo";
 
 const DEFAULTS = {
   /* Branding */
