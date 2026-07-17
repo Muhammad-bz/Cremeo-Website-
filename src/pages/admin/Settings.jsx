@@ -133,13 +133,18 @@ async function uploadToCloudinary(file) {
   formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-    { method: "POST", body: formData }
-  );
-  if (!res.ok) throw new Error("Cloudinary upload failed");
-  const data = await res.json();
-  return data.secure_url;
+  `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+  { method: "POST", body: formData }
+);
+
+const data = await res.json();
+console.log("Cloudinary response:", data);
+
+if (!res.ok) {
+  throw new Error(data.error?.message || "Cloudinary upload failed");
 }
+
+return data.secure_url;
 
 /* ─────────────────────────────────────────────────
    COMPONENT-SCOPED STYLES
@@ -529,8 +534,9 @@ function ImageUpload({ label, value, onChange, hint, full = true }) {
       const url = await uploadToCloudinary(file);
       onChange(url);
     } catch (err) {
-      setError("Upload failed. Check Cloudinary config.");
-    } finally {
+  console.error(err);
+  alert(err.message);
+} finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
     }
