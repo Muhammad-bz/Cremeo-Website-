@@ -145,6 +145,7 @@ if (!res.ok) {
 }
 
 return data.secure_url;
+}
 
 /* ─────────────────────────────────────────────────
    COMPONENT-SCOPED STYLES
