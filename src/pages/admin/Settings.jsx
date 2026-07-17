@@ -1,12 +1,11 @@
 // src/pages/admin/Settings.jsx
-// Phase 8 — Website Control Center (Settings)
-// Firestore + Cloudinary image uploads, full settings suite.
+// Phase 9 — Business Settings (simplified)
+// Firestore + Cloudinary image uploads. Business info only.
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   Store,
   Globe,
   Clock,
-  Layout,
   Layers,
   Instagram,
   Facebook,
@@ -19,15 +18,11 @@ import {
   RotateCcw,
   CheckCircle2,
   X,
-  Search,
-  BarChart2,
-  Building2,
   Youtube,
   Image as ImageIcon,
   Upload,
   Loader,
   DollarSign,
-  Palette,
 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
@@ -58,65 +53,36 @@ const DAY_ABR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const FIRESTORE_DOC = { collection: "settings", id: "site" };
 
-/* Cloudinary config — replace with your own cloud name & unsigned preset */
-const CLOUDINARY_CLOUD_NAME = "leu4dssl";
+/* Cloudinary config */
+const CLOUDINARY_CLOUD_NAME    = "leu4dssl";
 const CLOUDINARY_UPLOAD_PRESET = "cremeo";
 
+/* Only the fields the client is allowed to edit */
 const DEFAULTS = {
   /* Branding */
-  storeName:       "Cremeo",
-  tagline:         "Artisan Coffee & Fine Blends",
-  logoUrl:         "",
-  faviconUrl:      "",
-  heroBannerUrl:   "",
-  aboutImageUrl:   "",
-  aboutText:       "",
-  themeColor:      "#C9A84C",
-  accentColor:     "#5C3317",
+  storeName:     "Cremeo",
+  tagline:       "Artisan Coffee & Fine Blends",
+  logoUrl:       "",
+  heroBannerUrl: "",
+  aboutImageUrl: "",
+  aboutText:     "",
   /* Contact */
-  phone:           "",
-  whatsapp:        "",
-  email:           "",
-  address:         "",
-  mapsEmbedUrl:    "",
+  phone:         "",
+  whatsapp:      "",
+  email:         "",
+  address:       "",
+  mapsEmbedUrl:  "",
   /* Social */
-  instagram:       "",
-  facebook:        "",
-  tiktok:          "",
-  youtube:         "",
-  /* Business */
-  openingTime:     "08:00",
-  closingTime:     "22:00",
-  closedDays:      [],
-  deliveryFee:     "",
-  minimumOrder:    "",
-  currency:        "PKR",
-  currencySymbol:  "Rs.",
-  /* Homepage */
-  heroTitle:       "Crafted for the Curious",
-  heroSubtitle:    "Premium single-origin beans, roasted to order.",
-  heroButtonText:  "Shop Now",
-  /* SEO */
-  seoTitle:        "",
-  metaDescription: "",
-  metaKeywords:    "",
-  canonicalUrl:    "",
-  robots:          "index",
-  ogImageUrl:      "",
-  twitterImageUrl: "",
-  /* Analytics */
-  ga4Id:           "",
-  gtmId:           "",
-  fbPixelId:       "",
-  gscVerification: "",
-  /* Local Business */
-  googleBusinessUrl: "",
-  latitude:          "",
-  longitude:         "",
-  cuisineType:       "",
-  priceRange:        "$",
-  deliveryAvailable: true,
-  pickupAvailable:   true,
+  instagram:     "",
+  facebook:      "",
+  tiktok:        "",
+  youtube:       "",
+  /* Business hours & delivery */
+  openingTime:   "08:00",
+  closingTime:   "22:00",
+  closedDays:    [],
+  deliveryFee:   "",
+  minimumOrder:  "",
 };
 
 function settingsEqual(a, b) {
@@ -126,9 +92,6 @@ function settingsEqual(a, b) {
 
 /* ─────────────────────────────────────────────────
    CLOUDINARY UPLOAD HELPER
-   Uploads a File via the unsigned upload API and
-   reports progress via onProgress(0–100).
-   Returns the secure_url string on success.
 ───────────────────────────────────────────────── */
 async function uploadToCloudinary(file, onProgress) {
   return new Promise((resolve, reject) => {
@@ -143,9 +106,7 @@ async function uploadToCloudinary(file, onProgress) {
     );
 
     xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     });
 
     xhr.addEventListener("load", () => {
@@ -163,7 +124,6 @@ async function uploadToCloudinary(file, onProgress) {
 
     xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
     xhr.addEventListener("abort", () => reject(new Error("Upload cancelled.")));
-
     xhr.send(formData);
   });
 }
@@ -239,8 +199,7 @@ function SettingsStyles() {
       .set-input:hover  { border-color: rgba(201,168,76,0.38); background: #fff; }
       .set-input:focus  { border-color: ${C.gold}; box-shadow: 0 0 0 3px rgba(201,168,76,0.13); background: #fff; }
       .set-textarea { height: auto; padding: 11px 13px; resize: vertical; min-height: 72px; line-height: 1.55; }
-      input[type="time"].set-input  { cursor: pointer; }
-      input[type="color"].set-input { padding: 4px 6px; height: 44px; cursor: pointer; }
+      input[type="time"].set-input { cursor: pointer; }
 
       .set-days-row { display: flex; flex-wrap: wrap; gap: 8px; }
       .set-day-pill {
@@ -259,29 +218,6 @@ function SettingsStyles() {
       }
       .set-day-pill:active { transform: scale(0.95); }
       .set-day-dot { width: 6px; height: 6px; border-radius: 50%; background: ${C.gold}; flex-shrink: 0; }
-
-      /* Toggle switch */
-      .set-toggle-row {
-        display: flex; align-items: center; gap: 12px;
-        font-family: ${FONT_BODY}; font-size: 13.5px; color: ${C.espresso};
-      }
-      .set-toggle {
-        position: relative; width: 44px; height: 24px;
-        border-radius: 12px; border: none; cursor: pointer;
-        transition: background 0.2s;
-        flex-shrink: 0;
-      }
-      .set-toggle::after {
-        content: "";
-        position: absolute; top: 3px; left: 3px;
-        width: 18px; height: 18px; border-radius: 50%;
-        background: #fff;
-        transition: transform 0.2s;
-      }
-      .set-toggle.on  { background: ${C.gold}; }
-      .set-toggle.off { background: ${C.parchment}; }
-      .set-toggle.on::after  { transform: translateX(20px); }
-      .set-toggle.off::after { transform: translateX(0); }
 
       /* Image upload widget */
       .set-img-upload {
@@ -330,7 +266,6 @@ function SettingsStyles() {
         color: rgba(250,246,239,0.45); white-space: nowrap;
         overflow: hidden; text-overflow: ellipsis; min-width: 0;
       }
-
       .set-save-btn {
         display: inline-flex; align-items: center; justify-content: center; gap: 7px;
         padding: 0 22px; height: 42px;
@@ -343,7 +278,6 @@ function SettingsStyles() {
       }
       .set-save-btn:hover  { background: ${C.goldLight}; }
       .set-save-btn:active { transform: scale(0.97); }
-
       .set-reset-btn {
         display: inline-flex; align-items: center; justify-content: center; gap: 6px;
         padding: 0 16px; height: 42px;
@@ -382,26 +316,6 @@ function SettingsStyles() {
         transition: opacity 0.15s; -webkit-tap-highlight-color: transparent;
       }
       .set-toast-dismiss:hover { opacity: 1; }
-
-      .set-hint {
-        font-family: ${FONT_BODY}; font-size: 11.5px;
-        color: ${C.mist}; opacity: 0.65;
-        font-style: italic; margin-top: 14px; line-height: 1.5;
-      }
-
-      .set-select {
-        font-family: ${FONT_BODY}; font-size: 13.5px; color: ${C.espresso};
-        background: ${C.cream}; border: 1px solid ${C.line};
-        border-radius: 8px; padding: 0 13px; height: 44px; width: 100%;
-        box-sizing: border-box; outline: none; cursor: pointer;
-        -webkit-appearance: none; appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A6558' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 13px center;
-        padding-right: 36px;
-        transition: border-color 0.18s, box-shadow 0.18s;
-      }
-      .set-select:focus { border-color: ${C.gold}; box-shadow: 0 0 0 3px rgba(201,168,76,0.13); }
 
       .set-loading-overlay {
         display: flex; align-items: center; justify-content: center;
@@ -513,35 +427,6 @@ function Textarea({ value, onChange, placeholder, rows = 3 }) {
   );
 }
 
-function Select({ value, onChange, options }) {
-  return (
-    <select className="set-select" value={value} onChange={onChange}>
-      {options.map((o) => (
-        <option key={o.value ?? o} value={o.value ?? o}>
-          {o.label ?? o}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function Toggle({ checked, onChange, label }) {
-  return (
-    <div className="set-toggle-row">
-      <button
-        type="button"
-        className={`set-toggle ${checked ? "on" : "off"}`}
-        onClick={() => onChange(!checked)}
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-      />
-      <span>{label}</span>
-    </div>
-  );
-}
-
-/* Cloudinary image upload widget */
 function ImageUpload({ label, value, onChange, hint, full = true }) {
   const [uploading,      setUploading]      = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -550,23 +435,16 @@ function ImageUpload({ label, value, onChange, hint, full = true }) {
 
   const handleFile = useCallback(async (e) => {
     const file = e.target.files?.[0];
-    if (inputRef.current) inputRef.current.value = ""; // reset so same file can be re-selected
+    if (inputRef.current) inputRef.current.value = "";
     if (!file) return;
-
-    // Basic client-side guard
-    if (!file.type.startsWith("image/")) {
-      setError("Please select an image file.");
-      return;
-    }
+    if (!file.type.startsWith("image/")) { setError("Please select an image file."); return; }
 
     setUploading(true);
     setUploadProgress(0);
     setError("");
 
     try {
-      const url = await uploadToCloudinary(file, (pct) => {
-        setUploadProgress(pct);
-      });
+      const url = await uploadToCloudinary(file, (pct) => setUploadProgress(pct));
       onChange(url);
     } catch (err) {
       console.error("Cloudinary upload error:", err);
@@ -595,7 +473,7 @@ function ImageUpload({ label, value, onChange, hint, full = true }) {
             disabled={uploading}
           >
             {uploading
-              ? <><Loader size={12} className="set-spinner" /> Uploading…</>
+              ? <><Loader size={12} className="set-spinner" /> Uploading {uploadProgress}%</>
               : <><Upload size={12} /> {value ? "Replace" : "Upload"}</>}
           </button>
           {value && (
@@ -695,22 +573,26 @@ function SaveBar({ visible, saving, onSave, onReset }) {
    MAIN PAGE
 ───────────────────────────────────────────────── */
 export default function Settings() {
-  const [values,    setValues]    = useState({ ...DEFAULTS });
-  const [saved,     setSaved]     = useState({ ...DEFAULTS });
-  const [loading,   setLoading]   = useState(true);
-  const [saving,    setSaving]    = useState(false);
-  const [toast,     setToast]     = useState({ visible: false, message: "", isError: false });
-  const toastTimer                = useRef(null);
+  const [values,  setValues]  = useState({ ...DEFAULTS });
+  const [saved,   setSaved]   = useState({ ...DEFAULTS });
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [toast,   setToast]   = useState({ visible: false, message: "", isError: false });
+  const toastTimer             = useRef(null);
 
   const isDirty = !settingsEqual(values, saved);
 
-  /* ── Load from Firestore on mount ── */
+  /* ── Load from Firestore on mount — pick only allowed keys ── */
   useEffect(() => {
     async function load() {
       try {
         const snap = await getDoc(doc(db, FIRESTORE_DOC.collection, FIRESTORE_DOC.id));
         if (snap.exists()) {
-          const data = { ...DEFAULTS, ...snap.data() };
+          const raw  = snap.data();
+          const data = {};
+          Object.keys(DEFAULTS).forEach((k) => {
+            data[k] = raw[k] !== undefined ? raw[k] : DEFAULTS[k];
+          });
           setValues(data);
           setSaved(data);
         }
@@ -729,13 +611,8 @@ export default function Settings() {
     toastTimer.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), 3400);
   }, []);
 
-  /* Helpers */
   const field = useCallback(
     (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.value })),
-    []
-  );
-  const boolField = useCallback(
-    (key) => (val) => setValues((v) => ({ ...v, [key]: val })),
     []
   );
   const imageField = useCallback(
@@ -747,13 +624,15 @@ export default function Settings() {
     []
   );
 
-  /* ── Save to Firestore ── */
+  /* ── Save only allowed fields to Firestore ── */
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
+      const payload = {};
+      Object.keys(DEFAULTS).forEach((k) => { payload[k] = values[k]; });
       await setDoc(
         doc(db, FIRESTORE_DOC.collection, FIRESTORE_DOC.id),
-        { ...values },
+        payload,
         { merge: true }
       );
       setSaved({ ...values });
@@ -766,9 +645,7 @@ export default function Settings() {
     }
   }, [values, showToast]);
 
-  const handleReset = useCallback(() => {
-    setValues({ ...saved });
-  }, [saved]);
+  const handleReset = useCallback(() => setValues({ ...saved }), [saved]);
 
   const dismissToast = useCallback(() => {
     setToast((t) => ({ ...t, visible: false }));
@@ -814,14 +691,14 @@ export default function Settings() {
           </h1>
           <div style={{ width: 56, height: 1.5, background: C.gold, marginBottom: 10 }} />
           <p style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.mist, lineHeight: 1.6 }}>
-            Website Control Center — all changes are saved to Firestore and reflected on the live site.
+            Manage your store's business information. Changes are saved to Firestore and reflected on the live site.
           </p>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
           {/* ── 1. Store Branding ── */}
-          <SectionCard icon={Layers} title="Store Branding" subtitle="Visual identity and core content" delay={0}>
+          <SectionCard icon={Layers} title="Store Branding" subtitle="Name, tagline, logo and key images" delay={0}>
             <div className="set-grid">
               <Field label="Store Name">
                 <Input value={values.storeName} onChange={field("storeName")} placeholder="e.g. Cremeo" />
@@ -831,50 +708,24 @@ export default function Settings() {
                 <Input value={values.tagline} onChange={field("tagline")} placeholder="e.g. Artisan Coffee & Fine Blends" />
               </Field>
 
-              <Field label="Theme Color" labelIcon={Palette}>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input
-                    className="set-input"
-                    type="color"
-                    value={values.themeColor}
-                    onChange={field("themeColor")}
-                    style={{ width: 56, padding: "4px 6px", flexShrink: 0 }}
-                  />
-                  <input
-                    className="set-input"
-                    type="text"
-                    value={values.themeColor}
-                    onChange={field("themeColor")}
-                    placeholder="#C9A84C"
-                    style={{ flex: 1 }}
-                  />
-                </div>
-              </Field>
-
-              <Field label="Accent Color" labelIcon={Palette}>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input
-                    className="set-input"
-                    type="color"
-                    value={values.accentColor}
-                    onChange={field("accentColor")}
-                    style={{ width: 56, padding: "4px 6px", flexShrink: 0 }}
-                  />
-                  <input
-                    className="set-input"
-                    type="text"
-                    value={values.accentColor}
-                    onChange={field("accentColor")}
-                    placeholder="#5C3317"
-                    style={{ flex: 1 }}
-                  />
-                </div>
-              </Field>
-
-              <ImageUpload label="Logo" value={values.logoUrl} onChange={imageField("logoUrl")} hint="Recommended: SVG or PNG with transparent background" />
-              <ImageUpload label="Favicon" value={values.faviconUrl} onChange={imageField("faviconUrl")} hint="Recommended: 32×32 or 64×64 ICO/PNG" />
-              <ImageUpload label="Hero Banner" value={values.heroBannerUrl} onChange={imageField("heroBannerUrl")} hint="Recommended: 1600×900 JPG/WebP" />
-              <ImageUpload label="About Image" value={values.aboutImageUrl} onChange={imageField("aboutImageUrl")} hint="Recommended: 900×600 JPG/WebP" />
+              <ImageUpload
+                label="Logo"
+                value={values.logoUrl}
+                onChange={imageField("logoUrl")}
+                hint="Recommended: SVG or PNG with transparent background"
+              />
+              <ImageUpload
+                label="Hero Banner"
+                value={values.heroBannerUrl}
+                onChange={imageField("heroBannerUrl")}
+                hint="Recommended: 1600×900 JPG/WebP"
+              />
+              <ImageUpload
+                label="About Image"
+                value={values.aboutImageUrl}
+                onChange={imageField("aboutImageUrl")}
+                hint="Recommended: 900×600 JPG/WebP"
+              />
 
               <Field label="About Text" full>
                 <Textarea
@@ -913,7 +764,7 @@ export default function Settings() {
           </SectionCard>
 
           {/* ── 3. Social Media ── */}
-          <SectionCard icon={Globe} title="Social Media" subtitle="Links in your storefront footer" delay={0.08}>
+          <SectionCard icon={Globe} title="Social Media" subtitle="Links shown in your storefront footer" delay={0.08}>
             <div className="set-grid">
               <Field label="Instagram" labelIcon={Instagram}>
                 <Input value={values.instagram} onChange={field("instagram")} placeholder="https://instagram.com/cremeo" type="url" />
@@ -933,8 +784,8 @@ export default function Settings() {
             </div>
           </SectionCard>
 
-          {/* ── 4. Business ── */}
-          <SectionCard icon={Store} title="Business" subtitle="Hours, delivery, pricing" delay={0.12}>
+          {/* ── 4. Opening Hours & Delivery ── */}
+          <SectionCard icon={Store} title="Opening Hours & Delivery" subtitle="When you're open and your delivery pricing" delay={0.12}>
             <div className="set-grid">
               <Field label="Opening Time">
                 <input className="set-input" type="time" value={values.openingTime} onChange={field("openingTime")} />
@@ -944,19 +795,11 @@ export default function Settings() {
                 <input className="set-input" type="time" value={values.closingTime} onChange={field("closingTime")} />
               </Field>
 
-              <Field label="Currency">
-                <Input value={values.currency} onChange={field("currency")} placeholder="PKR" />
-              </Field>
-
-              <Field label="Currency Symbol" labelIcon={DollarSign}>
-                <Input value={values.currencySymbol} onChange={field("currencySymbol")} placeholder="Rs." />
-              </Field>
-
-              <Field label="Delivery Fee">
+              <Field label="Delivery Fee" labelIcon={DollarSign}>
                 <Input value={values.deliveryFee} onChange={field("deliveryFee")} placeholder="e.g. 150" />
               </Field>
 
-              <Field label="Minimum Order">
+              <Field label="Minimum Order" labelIcon={DollarSign}>
                 <Input value={values.minimumOrder} onChange={field("minimumOrder")} placeholder="e.g. 500" />
               </Field>
 
@@ -970,120 +813,6 @@ export default function Settings() {
                   )}
                 </p>
                 <DayPills value={values.closedDays} onChange={setClosedDays} />
-              </Field>
-            </div>
-          </SectionCard>
-
-          {/* ── 5. Homepage ── */}
-          <SectionCard icon={Layout} title="Homepage" subtitle="Hero section text shown on your storefront" delay={0.16}>
-            <div className="set-grid">
-              <Field label="Hero Title" full>
-                <Input value={values.heroTitle} onChange={field("heroTitle")} placeholder="e.g. Crafted for the Curious" />
-              </Field>
-
-              <Field label="Hero Subtitle" full>
-                <Textarea value={values.heroSubtitle} onChange={field("heroSubtitle")} placeholder="A supporting line below the main title" rows={2} />
-              </Field>
-
-              <Field label="Button Text">
-                <Input value={values.heroButtonText} onChange={field("heroButtonText")} placeholder="e.g. Shop Now" />
-              </Field>
-            </div>
-          </SectionCard>
-
-          {/* ── 6. SEO ── */}
-          <SectionCard icon={Search} title="SEO" subtitle="Search engine optimisation settings" delay={0.20}>
-            <div className="set-grid">
-              <Field label="Website Title" full>
-                <Input value={values.seoTitle} onChange={field("seoTitle")} placeholder="Cremeo — Artisan Bakery Lahore" />
-              </Field>
-
-              <Field label="Meta Description" full>
-                <Textarea value={values.metaDescription} onChange={field("metaDescription")} placeholder="A 150–160 character description of your site…" rows={2} />
-              </Field>
-
-              <Field label="Meta Keywords" full>
-                <Input value={values.metaKeywords} onChange={field("metaKeywords")} placeholder="bakery, cakes, lahore, custom cakes" />
-              </Field>
-
-              <Field label="Canonical URL" full>
-                <Input value={values.canonicalUrl} onChange={field("canonicalUrl")} placeholder="https://cremeo.pk" type="url" />
-              </Field>
-
-              <Field label="Robots">
-                <Select
-                  value={values.robots}
-                  onChange={field("robots")}
-                  options={[
-                    { value: "index",   label: "Index (default)" },
-                    { value: "noindex", label: "NoIndex" },
-                  ]}
-                />
-              </Field>
-
-              <ImageUpload label="Open Graph Image" value={values.ogImageUrl} onChange={imageField("ogImageUrl")} hint="1200×630 JPG/PNG — shown when shared on social media" />
-              <ImageUpload label="Twitter / X Card Image" value={values.twitterImageUrl} onChange={imageField("twitterImageUrl")} hint="1200×628 JPG/PNG — Twitter card image" />
-            </div>
-          </SectionCard>
-
-          {/* ── 7. Analytics ── */}
-          <SectionCard icon={BarChart2} title="Analytics" subtitle="Tracking and measurement IDs" delay={0.24}>
-            <div className="set-grid">
-              <Field label="Google Analytics GA4 ID">
-                <Input value={values.ga4Id} onChange={field("ga4Id")} placeholder="G-XXXXXXXXXX" />
-              </Field>
-
-              <Field label="Google Tag Manager ID">
-                <Input value={values.gtmId} onChange={field("gtmId")} placeholder="GTM-XXXXXXX" />
-              </Field>
-
-              <Field label="Facebook Pixel ID">
-                <Input value={values.fbPixelId} onChange={field("fbPixelId")} placeholder="1234567890" />
-              </Field>
-
-              <Field label="Google Search Console Verification Tag" full>
-                <Input value={values.gscVerification} onChange={field("gscVerification")} placeholder="meta content value from GSC" />
-              </Field>
-            </div>
-          </SectionCard>
-
-          {/* ── 8. Local Business ── */}
-          <SectionCard icon={Building2} title="Local Business" subtitle="Structured data for search engines and maps" delay={0.28}>
-            <div className="set-grid">
-              <Field label="Google Business Profile URL" full>
-                <Input value={values.googleBusinessUrl} onChange={field("googleBusinessUrl")} placeholder="https://g.page/cremeo" type="url" />
-              </Field>
-
-              <Field label="Latitude">
-                <Input value={values.latitude} onChange={field("latitude")} placeholder="31.4504" />
-              </Field>
-
-              <Field label="Longitude">
-                <Input value={values.longitude} onChange={field("longitude")} placeholder="74.3587" />
-              </Field>
-
-              <Field label="Cuisine Type">
-                <Input value={values.cuisineType} onChange={field("cuisineType")} placeholder="Bakery, Desserts, Coffee" />
-              </Field>
-
-              <Field label="Price Range">
-                <Select
-                  value={values.priceRange}
-                  onChange={field("priceRange")}
-                  options={[
-                    { value: "$",   label: "$ — Budget" },
-                    { value: "$$",  label: "$$ — Moderate" },
-                    { value: "$$$", label: "$$$ — Upscale" },
-                  ]}
-                />
-              </Field>
-
-              <Field label="Delivery Available" full>
-                <Toggle checked={values.deliveryAvailable} onChange={boolField("deliveryAvailable")} label="Accept delivery orders" />
-              </Field>
-
-              <Field label="Pickup Available" full>
-                <Toggle checked={values.pickupAvailable} onChange={boolField("pickupAvailable")} label="Accept pickup orders" />
               </Field>
             </div>
           </SectionCard>
