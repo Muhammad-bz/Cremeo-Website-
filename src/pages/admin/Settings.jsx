@@ -126,25 +126,46 @@ function settingsEqual(a, b) {
 
 /* ─────────────────────────────────────────────────
    CLOUDINARY UPLOAD HELPER
+   Uploads a File via the unsigned upload API and
+   reports progress via onProgress(0–100).
+   Returns the secure_url string on success.
 ───────────────────────────────────────────────── */
-async function uploadToCloudinary(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+async function uploadToCloudinary(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
-  const res = await fetch(
-  `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-  { method: "POST", body: formData }
-);
+    const xhr = new XMLHttpRequest();
+    xhr.open(
+      "POST",
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
+    );
 
-const data = await res.json();
-console.log("Cloudinary response:", data);
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
 
-if (!res.ok) {
-  throw new Error(data.error?.message || "Cloudinary upload failed");
-}
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data.secure_url);
+        } catch {
+          reject(new Error("Invalid response from Cloudinary."));
+        }
+      } else {
+        reject(new Error(`Upload failed (HTTP ${xhr.status}).`));
+      }
+    });
 
-return data.secure_url;
+    xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
+    xhr.addEventListener("abort", () => reject(new Error("Upload cancelled.")));
+
+    xhr.send(formData);
+  });
 }
 
 /* ─────────────────────────────────────────────────
@@ -522,24 +543,36 @@ function Toggle({ checked, onChange, label }) {
 
 /* Cloudinary image upload widget */
 function ImageUpload({ label, value, onChange, hint, full = true }) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
+  const [uploading,      setUploading]      = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error,          setError]          = useState("");
   const inputRef = useRef(null);
 
   const handleFile = useCallback(async (e) => {
     const file = e.target.files?.[0];
+    if (inputRef.current) inputRef.current.value = ""; // reset so same file can be re-selected
     if (!file) return;
+
+    // Basic client-side guard
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file.");
+      return;
+    }
+
     setUploading(true);
+    setUploadProgress(0);
     setError("");
+
     try {
-      const url = await uploadToCloudinary(file);
+      const url = await uploadToCloudinary(file, (pct) => {
+        setUploadProgress(pct);
+      });
       onChange(url);
     } catch (err) {
-  console.error(err);
-  alert(err.message);
-} finally {
+      console.error("Cloudinary upload error:", err);
+      setError(err.message ?? "Upload failed. Please try again.");
+    } finally {
       setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
   }, [onChange]);
 
