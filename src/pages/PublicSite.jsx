@@ -7,7 +7,7 @@ import React, {
   useMemo,
   memo,
 } from "react";
-import { collection, getDocs, addDoc, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, getDoc, query, where, serverTimestamp, doc } from "firebase/firestore";
 import { db } from "../firebase/config";
 import {
   motion,
@@ -501,6 +501,258 @@ function useProducts() {
 }
 
 /* ═══════════════════════════════════════════════
+   SITE SETTINGS HOOK
+   Reads from Firestore settings/site document.
+   Falls back to hardcoded values for every field.
+═══════════════════════════════════════════════ */
+const SITE_DEFAULTS = {
+  storeName:         "Cremeo",
+  tagline:           "Artisan Bakery · Askari 11",
+  logoUrl:           "",
+  faviconUrl:        "",
+  heroBannerUrl:     "",
+  aboutImageUrl:     "",
+  aboutText:         "",
+  themeColor:        "#C9A84C",
+  accentColor:       "#5C3317",
+  phone:             "0313 5932718",
+  whatsapp:          "0313 5932718",
+  email:             "hello@cremeo.pk",
+  address:           "Shop No. 10, First Floor (West), Commercial Market, Sector C, Axkari Xi, Lahore",
+  mapsEmbedUrl:      "",
+  instagram:         "",
+  facebook:          "",
+  tiktok:            "",
+  youtube:           "",
+  openingTime:       "07:00",
+  closingTime:       "21:00",
+  closedDays:        [],
+  deliveryFee:       "",
+  minimumOrder:      "",
+  currency:          "PKR",
+  currencySymbol:    "Rs.",
+  heroTitle:         "Crafted for the Curious",
+  heroSubtitle:      "Premium single-origin beans, roasted to order.",
+  heroButtonText:    "Shop Now",
+  seoTitle:          "Cremeo — Artisan Bakery Lahore",
+  metaDescription:   "Handcrafted cakes, pastries and desserts baked fresh daily at Cremeo Artisan Bakery, Askari 11, Lahore.",
+  metaKeywords:      "bakery, cakes, lahore, custom cakes, desserts, cremeo",
+  canonicalUrl:      "",
+  robots:            "index",
+  ogImageUrl:        "",
+  twitterImageUrl:   "",
+  ga4Id:             "",
+  gtmId:             "",
+  fbPixelId:         "",
+  gscVerification:   "",
+  googleBusinessUrl: "",
+  latitude:          "",
+  longitude:         "",
+  cuisineType:       "Bakery, Desserts",
+  priceRange:        "$$",
+  deliveryAvailable: true,
+  pickupAvailable:   true,
+};
+
+function useSiteSettings() {
+  const [settings, setSettings] = useState(SITE_DEFAULTS);
+  const [loaded,   setLoaded]   = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchSettings() {
+      try {
+        const snap = await getDoc(doc(db, "settings", "site"));
+        if (!cancelled && snap.exists()) {
+          setSettings({ ...SITE_DEFAULTS, ...snap.data() });
+        }
+      } catch (err) {
+        // silently fall back to defaults
+        console.warn("Could not load site settings, using defaults.", err);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    }
+    fetchSettings();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { settings, loaded };
+}
+
+/* ─────────────────────────────────────────────────
+   SITE HEAD MANAGER
+   Applies document.title, favicon, meta tags,
+   Open Graph, Twitter Card, JSON-LD structured data.
+───────────────────────────────────────────────── */
+function SiteHead({ settings }) {
+  useEffect(() => {
+    const s = settings;
+
+    /* ── document.title ── */
+    document.title = s.seoTitle || s.storeName || "Cremeo";
+
+    /* ── Favicon ── */
+    if (s.faviconUrl) {
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = s.faviconUrl;
+    }
+
+    /* ── Theme color ── */
+    let themeMeta = document.querySelector("meta[name='theme-color']");
+    if (!themeMeta) {
+      themeMeta = document.createElement("meta");
+      themeMeta.name = "theme-color";
+      document.head.appendChild(themeMeta);
+    }
+    themeMeta.content = s.themeColor || "#C9A84C";
+
+    /* helper: ensure/update a <meta> by name or property */
+    const setMeta = (attr, key, content) => {
+      if (!content) return;
+      let el = document.querySelector(`meta[${attr}='${key}']`);
+      if (!el) { el = document.createElement("meta"); el.setAttribute(attr, key); document.head.appendChild(el); }
+      el.content = content;
+    };
+
+    /* helper: ensure/update a <link> by rel */
+    const setLink = (rel, href) => {
+      if (!href) return;
+      let el = document.querySelector(`link[rel='${rel}']`);
+      if (!el) { el = document.createElement("link"); el.rel = rel; document.head.appendChild(el); }
+      el.href = href;
+    };
+
+    /* helper: ensure/update a <script type="application/ld+json"> by id */
+    const setJsonLd = (id, data) => {
+      let el = document.getElementById(id);
+      if (!el) {
+        el = document.createElement("script");
+        el.type = "application/ld+json";
+        el.id   = id;
+        document.head.appendChild(el);
+      }
+      el.textContent = JSON.stringify(data, null, 2);
+    };
+
+    /* ── Standard meta ── */
+    setMeta("name", "description", s.metaDescription);
+    setMeta("name", "keywords",    s.metaKeywords);
+    setMeta("name", "robots",      s.robots === "noindex" ? "noindex,nofollow" : "index,follow");
+    if (s.gscVerification) setMeta("name", "google-site-verification", s.gscVerification);
+
+    /* ── Canonical ── */
+    setLink("canonical", s.canonicalUrl);
+
+    /* ── Open Graph ── */
+    setMeta("property", "og:title",       s.seoTitle || s.storeName);
+    setMeta("property", "og:description", s.metaDescription);
+    setMeta("property", "og:type",        "website");
+    setMeta("property", "og:url",         s.canonicalUrl);
+    setMeta("property", "og:image",       s.ogImageUrl);
+    setMeta("property", "og:site_name",   s.storeName);
+
+    /* ── Twitter Card ── */
+    setMeta("name", "twitter:card",        "summary_large_image");
+    setMeta("name", "twitter:title",       s.seoTitle || s.storeName);
+    setMeta("name", "twitter:description", s.metaDescription);
+    setMeta("name", "twitter:image",       s.twitterImageUrl || s.ogImageUrl);
+
+    /* ── Analytics: GA4 ── */
+    if (s.ga4Id && !document.getElementById("ga4-script")) {
+      const sc1 = document.createElement("script");
+      sc1.id  = "ga4-script";
+      sc1.src = `https://www.googletagmanager.com/gtag/js?id=${s.ga4Id}`;
+      sc1.async = true;
+      document.head.appendChild(sc1);
+      const sc2 = document.createElement("script");
+      sc2.id   = "ga4-inline";
+      sc2.text = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${s.ga4Id}');`;
+      document.head.appendChild(sc2);
+    }
+
+    /* ── Analytics: GTM ── */
+    if (s.gtmId && !document.getElementById("gtm-script")) {
+      const sc = document.createElement("script");
+      sc.id   = "gtm-script";
+      sc.text = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${s.gtmId}');`;
+      document.head.appendChild(sc);
+    }
+
+    /* ── Analytics: Facebook Pixel ── */
+    if (s.fbPixelId && !document.getElementById("fb-pixel-script")) {
+      const sc = document.createElement("script");
+      sc.id   = "fb-pixel-script";
+      sc.text = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${s.fbPixelId}');fbq('track','PageView');`;
+      document.head.appendChild(sc);
+    }
+
+    /* ── JSON-LD: Organization ── */
+    setJsonLd("jsonld-organization", {
+      "@context": "https://schema.org",
+      "@type":    "Organization",
+      "name":     s.storeName || "Cremeo",
+      "url":      s.canonicalUrl || undefined,
+      "logo":     s.logoUrl    || undefined,
+      "contactPoint": s.phone ? [{
+        "@type": "ContactPoint",
+        "telephone":    s.phone,
+        "contactType":  "customer service",
+      }] : undefined,
+      "sameAs": [s.instagram, s.facebook, s.youtube, s.tiktok, s.googleBusinessUrl].filter(Boolean),
+    });
+
+    /* ── JSON-LD: LocalBusiness / Restaurant ── */
+    const hoursSpec = [];
+    const allDays   = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+    const openDays  = allDays.filter((d) => !(s.closedDays || []).includes(d));
+    if (openDays.length && s.openingTime && s.closingTime) {
+      hoursSpec.push({
+        "@type":     "OpeningHoursSpecification",
+        "dayOfWeek": openDays.map((d) => `https://schema.org/${d}`),
+        "opens":     s.openingTime,
+        "closes":    s.closingTime,
+      });
+    }
+
+    setJsonLd("jsonld-localbusiness", {
+      "@context":       "https://schema.org",
+      "@type":          ["Restaurant", "LocalBusiness"],
+      "name":           s.storeName || "Cremeo",
+      "description":    s.metaDescription || undefined,
+      "url":            s.canonicalUrl    || undefined,
+      "telephone":      s.phone           || undefined,
+      "email":          s.email           || undefined,
+      "image":          s.ogImageUrl || s.heroBannerUrl || undefined,
+      "logo":           s.logoUrl         || undefined,
+      "priceRange":     s.priceRange      || "$$",
+      "servesCuisine":  s.cuisineType     || undefined,
+      "hasMap":         s.googleBusinessUrl || undefined,
+      "address":        s.address ? {
+        "@type":           "PostalAddress",
+        "streetAddress":   s.address,
+      } : undefined,
+      "geo": (s.latitude && s.longitude) ? {
+        "@type":     "GeoCoordinates",
+        "latitude":  parseFloat(s.latitude),
+        "longitude": parseFloat(s.longitude),
+      } : undefined,
+      "openingHoursSpecification": hoursSpec.length ? hoursSpec : undefined,
+      "hasDeliveryMethod":  s.deliveryAvailable ? "http://purl.org/goodrelations/v1#DeliveryModeDirectDownload" : undefined,
+      "sameAs": [s.instagram, s.facebook, s.youtube, s.tiktok, s.googleBusinessUrl].filter(Boolean),
+    });
+
+  }, [settings]);
+
+  return null;
+}
+
+/* ═══════════════════════════════════════════════
    RESPONSIVE DOOR IMAGES HOOK
 ═══════════════════════════════════════════════ */
 function useDoorImages() {
@@ -680,7 +932,7 @@ function DoorBell({ doorsReady }) {
    - bgScale uses transform3d via framer (GPU-composited)
    - Hero img gets fetchpriority="high" + decoding="sync" (above fold)
 ═══════════════════════════════════════════════ */
-function HeroSection({ onDoorsReady }) {
+function HeroSection({ onDoorsReady, settings = {} }) {
   const containerRef = useRef(null);
   const doorImages   = useDoorImages();
 
@@ -797,7 +1049,7 @@ function HeroSection({ onDoorsReady }) {
               /* Simple 2-keyframe pulse — cheaper than original */
               animation: "fadeIn 1.8s ease infinite alternate",
             }}>
-              CREMEO
+              {(settings.storeName || "CREMEO").toUpperCase()}
             </p>
             <div style={{
               width: 36, height: 1,
@@ -818,8 +1070,8 @@ function HeroSection({ onDoorsReady }) {
         >
           {/* fetchpriority + decoding=sync for LCP image */}
           <img
-            src={IMG.hero}
-            alt="Cremeo Artisan Bakery interior"
+            src={settings.heroBannerUrl || IMG.hero}
+            alt={`${settings.storeName || "Cremeo"} Artisan Bakery interior`}
             fetchPriority="high"
             decoding="sync"
             style={{
@@ -867,7 +1119,7 @@ function HeroSection({ onDoorsReady }) {
               letterSpacing: "0.12em", marginBottom: 18,
               textShadow: "0 4px 32px rgba(0,0,0,0.55)",
             }}>
-              CREMEO
+              {(settings.storeName || "CREMEO").toUpperCase()}
             </h1>
             <div style={{
               width: 52, height: 1,
@@ -880,7 +1132,7 @@ function HeroSection({ onDoorsReady }) {
               color: C.goldLight, letterSpacing: "0.07em", marginBottom: 54,
               textShadow: "0 2px 16px rgba(0,0,0,0.5)",
             }}>
-              Premium Desserts
+              {settings.heroSubtitle || settings.tagline || "Premium Desserts"}
             </p>
           </motion.div>
           <motion.div style={{ opacity: btnOp, y: btnY, pointerEvents: "auto", willChange: "transform, opacity" }}>
@@ -1049,7 +1301,7 @@ function HeroSection({ onDoorsReady }) {
          instead of 'all' — prevents layout recalculation on every transition tick.
          backdropFilter only applied when actually scrolled.
 ═══════════════════════════════════════════════ */
-function Navbar({ cartCount, onCartOpen, cartBouncing }) {
+function Navbar({ cartCount, onCartOpen, cartBouncing, settings = {} }) {
   const [scrolled,   setScrolled]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -1111,23 +1363,33 @@ function Navbar({ cartCount, onCartOpen, cartBouncing }) {
           }}
           aria-label="Back to top"
         >
-          <span style={{
-            fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 400,
-            color: scrolled ? C.espresso : C.cream,
-            letterSpacing: "0.06em", lineHeight: 1,
-            transition: "color 0.3s",
-          }}>
-            Cremeo
-          </span>
-          <span style={{
-            fontFamily: FONT_BODY, fontSize: 8, letterSpacing: "0.28em",
-            textTransform: "uppercase",
-            color: scrolled ? C.gold : "rgba(228,199,126,0.9)",
-            marginTop: 2,
-            transition: "color 0.3s",
-          }}>
-            Artisan Bakery
-          </span>
+          {settings.logoUrl ? (
+            <img
+              src={settings.logoUrl}
+              alt={settings.storeName || "Cremeo"}
+              style={{ height: 36, maxWidth: 140, objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            <>
+              <span style={{
+                fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 400,
+                color: scrolled ? C.espresso : C.cream,
+                letterSpacing: "0.06em", lineHeight: 1,
+                transition: "color 0.3s",
+              }}>
+                {settings.storeName || "Cremeo"}
+              </span>
+              <span style={{
+                fontFamily: FONT_BODY, fontSize: 8, letterSpacing: "0.28em",
+                textTransform: "uppercase",
+                color: scrolled ? C.gold : "rgba(228,199,126,0.9)",
+                marginTop: 2,
+                transition: "color 0.3s",
+              }}>
+                {settings.tagline || "Artisan Bakery"}
+              </span>
+            </>
+          )}
         </button>
 
         <div className="hide-mobile" style={{ display: "flex", gap: 32, alignItems: "center" }}>
@@ -1208,7 +1470,7 @@ function Navbar({ cartCount, onCartOpen, cartBouncing }) {
             borderBottom: "1px solid rgba(250,246,239,0.08)",
           }}>
             <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, color: C.cream, letterSpacing: "0.06em" }}>
-              Cremeo
+              {settings.storeName || "Cremeo"}
             </span>
             <button
               onClick={() => setMobileOpen(false)}
@@ -1237,8 +1499,8 @@ function Navbar({ cartCount, onCartOpen, cartBouncing }) {
             ))}
           </div>
           <div style={{ display: "flex", gap: 18, padding: "28px 0" }}>
-            <a href="#" style={{ color: C.gold }} aria-label="Instagram"><Instagram size={20} /></a>
-            <a href="#" style={{ color: C.gold }} aria-label="Facebook"><Facebook size={20} /></a>
+            {(settings.instagram || "#") && <a href={settings.instagram || "#"} target="_blank" rel="noopener noreferrer" style={{ color: C.gold }} aria-label="Instagram"><Instagram size={20} /></a>}
+            {(settings.facebook  || "#") && <a href={settings.facebook  || "#"} target="_blank" rel="noopener noreferrer" style={{ color: C.gold }} aria-label="Facebook"><Facebook size={20} /></a>}
           </div>
         </div>
       )}
@@ -1709,14 +1971,14 @@ function MenuSection({ onAdd, wishlist, toggleWish, products, loading, error }) 
 /* ═══════════════════════════════════════════════
    ABOUT SECTION
 ═══════════════════════════════════════════════ */
-const AboutSection = memo(function AboutSection() {
+const AboutSection = memo(function AboutSection({ settings = {} }) {
   return (
     <section id="about" className="section-pad" style={{ background: C.espresso }}>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <div className="about-grid">
           <div className="about-image-col reveal" style={{ position: "relative" }}>
             <img
-              src={IMG.about}
+              src={settings.aboutImageUrl || IMG.about}
               alt="Bakery interior"
               loading="lazy"
               decoding="async"
@@ -1766,22 +2028,34 @@ const AboutSection = memo(function AboutSection() {
               <br />
               <em style={{ fontStyle: "italic" }}>baked into the community</em>
             </h2>
-            <p style={{
-              fontFamily: FONT_BODY, fontWeight: 300, fontSize: 14,
-              color: "rgba(250,246,239,0.7)", lineHeight: 1.85, marginBottom: 18,
-            }}>
-              Cremeo was born in a home kitchen in Askari 11, Sector C. What started as weekend
-              sourdough for neighbors grew into something we could not contain — so in 2026 we
-              opened our doors properly.
-            </p>
-            <p style={{
-              fontFamily: FONT_BODY, fontWeight: 300, fontSize: 14,
-              color: "rgba(250,246,239,0.7)", lineHeight: 1.85, marginBottom: 32,
-            }}>
-              Every loaf, every layer, every laminated croissant is still made by hand. We use no
-              artificial preservatives — just honest ingredients, patience, and a wood-fired oven
-              we are unreasonably attached to.
-            </p>
+            {settings.aboutText ? (
+              <p style={{
+                fontFamily: FONT_BODY, fontWeight: 300, fontSize: 14,
+                color: "rgba(250,246,239,0.7)", lineHeight: 1.85, marginBottom: 32,
+                whiteSpace: "pre-line",
+              }}>
+                {settings.aboutText}
+              </p>
+            ) : (
+              <>
+                <p style={{
+                  fontFamily: FONT_BODY, fontWeight: 300, fontSize: 14,
+                  color: "rgba(250,246,239,0.7)", lineHeight: 1.85, marginBottom: 18,
+                }}>
+                  Cremeo was born in a home kitchen in Askari 11, Sector C. What started as weekend
+                  sourdough for neighbors grew into something we could not contain — so in 2026 we
+                  opened our doors properly.
+                </p>
+                <p style={{
+                  fontFamily: FONT_BODY, fontWeight: 300, fontSize: 14,
+                  color: "rgba(250,246,239,0.7)", lineHeight: 1.85, marginBottom: 32,
+                }}>
+                  Every loaf, every layer, every laminated croissant is still made by hand. We use no
+                  artificial preservatives — just honest ingredients, patience, and a wood-fired oven
+                  we are unreasonably attached to.
+                </p>
+              </>
+            )}
             <div className="stats-row">
               {[["5+", "Years Baking"], ["200+", "Recipes"], ["500+", "Happy Families"]].map(([n, l]) => (
                 <div key={l}>
@@ -1872,7 +2146,7 @@ const ReviewsSection = memo(function ReviewsSection() {
 /* ═══════════════════════════════════════════════
    CONTACT SECTION
 ═══════════════════════════════════════════════ */
-function ContactSection() {
+function ContactSection({ settings = {} }) {
   const [form, setForm] = useState({ name: "", phone: "", message: "" });
   const [sent, setSent] = useState(false);
 
@@ -1907,16 +2181,16 @@ function ContactSection() {
               color: C.cream, lineHeight: 1.15,
               margin: "16px 0 24px",
             }}>
-              Come find us at
+              Come find us
               <br />
-              <em style={{ fontStyle: "italic" }}>Axkari Xi, Lahore</em>
+              <em style={{ fontStyle: "italic" }}>{settings.address ? settings.address.split(",").slice(-2).join(",").trim() : "Axkari Xi, Lahore"}</em>
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               {[
-                { icon: <MapPin size={16} />, label: "Address", value: "Shop No. 10, First Floor (West), Commercial Market, Sector C, Axkari Xi, Lahore" },
-                { icon: <Phone size={16} />,  label: "Phone / WhatsApp", value: "0313 5932718" },
-                { icon: <Mail size={16} />,   label: "Email",   value: "hello@cremeo.pk" },
-                { icon: <Clock size={16} />,  label: "Hours",   value: "Mon – Sat: 7:00 AM – 9:00 PM\nSunday: 8:00 AM – 6:00 PM" },
+                { icon: <MapPin size={16} />, label: "Address",          value: settings.address  || "Shop No. 10, First Floor (West), Commercial Market, Sector C, Axkari Xi, Lahore" },
+                { icon: <Phone size={16} />,  label: "Phone / WhatsApp", value: (settings.phone || settings.whatsapp) ? `${settings.phone || ""}${settings.phone && settings.whatsapp ? " / " : ""}${settings.whatsapp || ""}` : "0313 5932718" },
+                { icon: <Mail size={16} />,   label: "Email",            value: settings.email    || "hello@cremeo.pk" },
+                { icon: <Clock size={16} />,  label: "Hours",            value: settings.openingTime && settings.closingTime ? `${settings.openingTime} – ${settings.closingTime}${(settings.closedDays || []).length ? `\nClosed: ${(settings.closedDays || []).join(", ")}` : ""}` : "Mon – Sat: 7:00 AM – 9:00 PM\nSunday: 8:00 AM – 6:00 PM" },
               ].map((it) => (
                 <div key={it.label} style={{ display: "flex", gap: 14 }}>
                   <div style={{
@@ -1939,11 +2213,17 @@ function ContactSection() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
-              {[Instagram, Facebook, Twitter].map((Icon, i) => (
+              {[
+                { Icon: Instagram, href: settings.instagram, label: "Instagram" },
+                { Icon: Facebook,  href: settings.facebook,  label: "Facebook"  },
+                { Icon: Twitter,   href: "#",                label: "Twitter"   },
+              ].filter((s) => s.href).map(({ Icon, href, label }) => (
                 <a
-                  key={i}
-                  href="#"
-                  aria-label="Social link"
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
                   style={{
                     width: 38, height: 38, borderRadius: "50%",
                     border: "1px solid rgba(201,168,76,0.3)",
@@ -1957,6 +2237,20 @@ function ContactSection() {
                 </a>
               ))}
             </div>
+            {settings.mapsEmbedUrl && (
+              <div style={{ marginTop: 28, borderRadius: 6, overflow: "hidden", border: "1px solid rgba(201,168,76,0.15)" }}>
+                <iframe
+                  src={settings.mapsEmbedUrl}
+                  width="100%"
+                  height="200"
+                  style={{ border: 0, display: "block" }}
+                  allowFullScreen=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title="Location map"
+                />
+              </div>
+            )}
           </div>
 
           <div className="reveal" style={{ display: "flex", flexDirection: "column" }}>
@@ -2017,7 +2311,7 @@ function ContactSection() {
 /* ═══════════════════════════════════════════════
    FOOTER
 ═══════════════════════════════════════════════ */
-const Footer = memo(function Footer() {
+const Footer = memo(function Footer({ settings = {} }) {
   const scrollTo = useCallback((id) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }),
   []);
@@ -2031,15 +2325,20 @@ const Footer = memo(function Footer() {
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <div className="footer-grid">
           <div className="footer-brand">
-            <p style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 300, color: C.cream, letterSpacing: "0.06em", marginBottom: 4 }}>
-              Cremeo
-            </p>
+            {settings.logoUrl ? (
+              <img src={settings.logoUrl} alt={settings.storeName || "Cremeo"} style={{ height: 40, maxWidth: 160, objectFit: "contain", marginBottom: 10, display: "block" }} />
+            ) : (
+              <p style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 300, color: C.cream, letterSpacing: "0.06em", marginBottom: 4 }}>
+                {settings.storeName || "Cremeo"}
+              </p>
+            )}
             <p style={{ fontFamily: FONT_BODY, fontSize: 9, letterSpacing: "0.28em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>
-              Artisan Bakery &middot; Askari 11
+              {settings.tagline || "Artisan Bakery · Askari 11"}
             </p>
             <p style={{ fontFamily: FONT_BODY, fontSize: 13, fontWeight: 300, color: "rgba(250,246,239,0.4)", lineHeight: 1.7, maxWidth: 280 }}>
-              Handcrafted with honest ingredients every single morning. No shortcuts.
-              No preservatives. Just good baking.
+              {settings.aboutText
+                ? settings.aboutText.substring(0, 120) + (settings.aboutText.length > 120 ? "…" : "")
+                : "Handcrafted with honest ingredients every single morning. No shortcuts. No preservatives. Just good baking."}
             </p>
           </div>
 
@@ -2072,8 +2371,10 @@ const Footer = memo(function Footer() {
             <p style={{ fontFamily: FONT_BODY, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: C.gold, marginBottom: 16 }}>
               Hours
             </p>
-            <p style={{ fontFamily: FONT_BODY, fontSize: 13, fontWeight: 300, color: "rgba(250,246,239,0.45)", lineHeight: 2 }}>
-              Mon &ndash; Sat<br />7:00 AM &ndash; 9:00 PM<br /><br />Sunday<br />8:00 AM &ndash; 6:00 PM
+            <p style={{ fontFamily: FONT_BODY, fontSize: 13, fontWeight: 300, color: "rgba(250,246,239,0.45)", lineHeight: 2, whiteSpace: "pre-line" }}>
+              {settings.openingTime && settings.closingTime
+                ? `${settings.openingTime} – ${settings.closingTime}${(settings.closedDays || []).length ? `\nClosed: ${(settings.closedDays || []).join(", ")}` : ""}`
+                : `Mon – Sat\n7:00 AM – 9:00 PM\n\nSunday\n8:00 AM – 6:00 PM`}
             </p>
           </div>
         </div>
@@ -2085,10 +2386,10 @@ const Footer = memo(function Footer() {
           flexWrap: "wrap", gap: 10,
         }}>
           <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: "rgba(250,246,239,0.22)" }}>
-            &copy; {new Date().getFullYear()} Cremeo Artisan Bakery. All rights reserved.
+            &copy; {new Date().getFullYear()} {settings.storeName || "Cremeo"} Artisan Bakery. All rights reserved.
           </p>
           <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: "rgba(250,246,239,0.18)" }}>
-            Askari 11, Sector C &middot; Lahore
+            {settings.address ? settings.address.split(",").slice(-2).join(",").trim() : "Askari 11, Sector C · Lahore"}
           </p>
         </div>
       </div>
@@ -2102,7 +2403,7 @@ const Footer = memo(function Footer() {
 ═══════════════════════════════════════════════ */
 const EMPTY_CHECKOUT = { customerName: "", phone: "", address: "", notes: "" };
 
-function CheckoutForm({ cart, total, onBack, onSuccess }) {
+function CheckoutForm({ cart, total, onBack, onSuccess, settings = {} }) {
   const [form,       setForm]       = useState(EMPTY_CHECKOUT);
   const [errors,     setErrors]     = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -2268,7 +2569,7 @@ function CheckoutForm({ cart, total, onBack, onSuccess }) {
           {submitting ? "Placing Order…" : <><Check size={14} /> Place Order</>}
         </button>
         <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.mist, textAlign: "center" }}>
-          Or call / WhatsApp: <strong>0313 5932718</strong>
+          Or call / WhatsApp: <strong>{settings.whatsapp || settings.phone || "0313 5932718"}</strong>
         </p>
       </div>
     </div>
@@ -2320,6 +2621,7 @@ function OrderSuccess({ onClose }) {
         <p style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.mist, marginBottom: 28 }}>
           Questions? Call / WhatsApp: <strong style={{ color: C.espresso }}>0313 5932718</strong>
         </p>
+        {/* Note: OrderSuccess doesn't receive settings — the number above is a safe fallback */}
         <button className="btn-primary" onClick={onClose}>
           Continue Shopping
         </button>
@@ -2334,7 +2636,7 @@ function OrderSuccess({ onClose }) {
    PERF: Conditionally rendered only when open.
          slideInRight uses translate3d (GPU-composited).
 ═══════════════════════════════════════════════ */
-function CartDrawer({ open, onClose, cart, updateQty, removeItem, onOrderSuccess }) {
+function CartDrawer({ open, onClose, cart, updateQty, removeItem, onOrderSuccess, settings = {} }) {
   // "cart" | "checkout" | "success"
   const [step, setStep] = useState("cart");
 
@@ -2386,6 +2688,7 @@ function CartDrawer({ open, onClose, cart, updateQty, removeItem, onOrderSuccess
             total={total}
             onBack={() => setStep("cart")}
             onSuccess={handleSuccess}
+            settings={settings}
           />
         )}
 
@@ -2503,7 +2806,7 @@ function CartDrawer({ open, onClose, cart, updateQty, removeItem, onOrderSuccess
                   Proceed to Checkout
                 </button>
                 <p style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.mist, textAlign: "center" }}>
-                  Or call / WhatsApp: <strong>0313 5932718</strong>
+                  Or call / WhatsApp: <strong>{settings.whatsapp || settings.phone || "0313 5932718"}</strong>
                 </p>
               </div>
             )}
@@ -2525,6 +2828,7 @@ export default function PublicSite() {
   const [doorsReady,   setDoorsReady]   = useState(false);
 
   const { products, loading, error } = useProducts();
+  const { settings }                 = useSiteSettings();
 
   useReveal();
 
@@ -2564,6 +2868,7 @@ export default function PublicSite() {
 
   return (
     <>
+      <SiteHead settings={settings} />
       <GlobalStyles />
 
       <DoorBell doorsReady={doorsReady} />
@@ -2572,19 +2877,20 @@ export default function PublicSite() {
         cartCount={cartCount}
         onCartOpen={openCart}
         cartBouncing={cartBouncing}
+        settings={settings}
       />
 
       <main>
-        <HeroSection onDoorsReady={onDoorsReady} />
+        <HeroSection onDoorsReady={onDoorsReady} settings={settings} />
         <TrustStrip />
         <FeaturedSection onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} products={products} loading={loading} error={error} />
         <MenuSection     onAdd={addToCart} wishlist={wishlist} toggleWish={toggleWish} products={products} loading={loading} error={error} />
-        <AboutSection />
+        <AboutSection settings={settings} />
         <ReviewsSection />
-        <ContactSection />
+        <ContactSection settings={settings} />
       </main>
 
-      <Footer />
+      <Footer settings={settings} />
 
       <CartDrawer
         open={cartOpen}
@@ -2593,6 +2899,7 @@ export default function PublicSite() {
         updateQty={updateQty}
         removeItem={removeItem}
         onOrderSuccess={clearCart}
+        settings={settings}
       />
     </>
   );
